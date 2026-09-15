@@ -341,6 +341,7 @@ struct GameView: View {
     @State private var showScorePopup: Bool = false
     @State private var popupScore: Double = 0.0
     @State private var recoilOffset: CGSize = .zero
+    @State private var lastShotTime: Date? = nil
 
     private let targetRadius: CGFloat = 110.0
     private var l10n: L10n { L10n(lang: language) }
@@ -705,21 +706,35 @@ struct GameView: View {
         return CGPoint(x: x, y: y)
     }
 
-    /// 真實射擊下壓瞄準（未長按時準星在上方，長按後緩緩下壓，時間調整為 2.8 秒平穩入瞄）
+    /// 真實射擊下壓瞄準（射完或未長按時，準星回到上方起始點飄移；長按後緩緩下壓，時間約 2.8 秒平穩入瞄）
     private func entryDropOffset(now: Date) -> CGFloat {
-        guard let start = breathStartTime else {
-            // 未長按瞄準時，槍口抬在上方待命
-            return -52.0
+        let topRestY: CGFloat = -52.0
+
+        if isHoldingBreath, let start = breathStartTime {
+            // 長按瞄準中：從上方緩緩往下壓入瞄區（約 2.8 秒）
+            let elapsed = max(0.0, now.timeIntervalSince(start))
+            let entryDuration: Double = 2.8
+            if elapsed >= entryDuration {
+                return 0.0
+            }
+            let progress = elapsed / entryDuration
+            let easeOut = 1.0 - pow(1.0 - progress, 3)
+            return topRestY * CGFloat(1.0 - easeOut)
+        } else if let shotTime = lastShotTime {
+            // 剛射擊完（鬆開後）：先輕微後座跳動，然後在約 1.2 秒內慢慢升回上方起始點飄移
+            let elapsed = max(0.0, now.timeIntervalSince(shotTime))
+            let returnDuration: Double = 1.2
+            if elapsed >= returnDuration {
+                return topRestY
+            }
+            let progress = elapsed / returnDuration
+            // 平滑升起回頂部
+            let ease = 1.0 - pow(1.0 - progress, 2)
+            return topRestY * CGFloat(ease)
+        } else {
+            // 初始待命：在上方起始點飄移
+            return topRestY
         }
-        let elapsed = max(0.0, now.timeIntervalSince(start))
-        let entryDuration: Double = 2.8 // 從 1.8s 放慢至 2.8s，更從容沉穩
-        if elapsed >= entryDuration {
-            return 0.0
-        }
-        // 三次平滑曲線 (Ease Out)，從 -52pt 慢慢下壓至 0pt
-        let progress = elapsed / entryDuration
-        let easeOut = 1.0 - pow(1.0 - progress, 3)
-        return -52.0 * CGFloat(1.0 - easeOut)
     }
 
     private func fireShot() {
@@ -730,30 +745,32 @@ struct GameView: View {
 
         SoundManager.shared.playGunshot()
 
-        let now = Date().timeIntervalSinceReferenceDate
-        let effectiveBreath = isBreathHoldingActive(now: Date())
+        let fireDate = Date()
+        lastShotTime = fireDate
+        let now = fireDate.timeIntervalSinceReferenceDate
+        let effectiveBreath = isBreathHoldingActive(now: fireDate)
         let sway = calculateSway(at: now, mode: aimMode, isHoldingBreath: effectiveBreath)
-        let entryDrop = entryDropOffset(now: Date())
+        let entryDrop = entryDropOffset(now: fireDate)
 
         let impactX = sway.x
         let impactY = entryDrop + sway.y
         let impactPoint = CGPoint(x: impactX, y: impactY)
 
-        // 後座力物理模擬：瞬間依目前晃動前進方向急速跳動，隨後平復回到上方
+        // 柔和後座力模擬（輕度反射）：瞬間隨前進方向微幅跳動
         let deltaT = 0.05
         let swayNext = calculateSway(at: now + deltaT, mode: aimMode, isHoldingBreath: effectiveBreath)
         let dirX = swayNext.x - sway.x
         let dirY = swayNext.y - sway.y
         let dirLen = max(0.001, sqrt(dirX * dirX + dirY * dirY))
-        let recoilPower: CGFloat = (aimMode == .pistol) ? 26.0 : 16.0
+        let recoilPower: CGFloat = (aimMode == .pistol) ? 9.0 : 5.5 // 輕量後座跳動
         let kickX = (dirX / dirLen) * recoilPower
-        let kickY = (dirY / dirLen) * recoilPower - 8.0 // 加上槍口自然向上跳動
+        let kickY = (dirY / dirLen) * recoilPower - 4.0 // 輕微向上
 
-        withAnimation(.easeOut(duration: 0.08)) {
+        withAnimation(.easeOut(duration: 0.06)) {
             recoilOffset = CGSize(width: kickX, height: kickY)
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            withAnimation(.easeOut(duration: 0.25)) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) {
+            withAnimation(.easeOut(duration: 0.20)) {
                 recoilOffset = .zero
             }
         }
