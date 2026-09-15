@@ -1285,28 +1285,22 @@ struct InstructionsSheetView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         instructionItem(
-                            title: language == .traditionalChinese ? "操作方式（長按穩瞄 · 鬆手擊發）" : "Controls (Hold to Aim · Release to Shoot)",
+                            title: language == .traditionalChinese ? "🎮 操作方式：長按瞄準，鬆手開槍" : "🎮 Controls: Hold to Aim, Release to Fire",
                             desc: language == .traditionalChinese ?
-                                "手指按住靶面立即進入「屏息穩瞄」狀態，模擬真實射擊從上方平穩下壓落入瞄區；掌握槍口微幅晃動時機後，鬆開手指瞬間即刻擊發！" :
-                                "Press and hold to steady your aim as the sight smoothly descends into the target area like real shooting. Time the sway and release your touch to fire!"
+                                "• 瞄準：長按螢幕（靶面）進入「屏息穩瞄」狀態。\n• 擊發：抓準槍口微幅晃動的時機，鬆開手指即可開槍。" :
+                                "• Aim: Press and hold the target area to steady your breath and aim.\n• Fire: Time your shot with the subtle barrel sway, and release your finger to fire."
                         )
                         instructionItem(
-                            title: language == .traditionalChinese ? "10米手槍（特大W型瞄準法）" : "10m Pistol (Extra Large W-Sight)",
+                            title: language == .traditionalChinese ? "🎯 高分瞄準訣竅" : "🎯 Pro Sighting Tips for High Scores",
                             desc: language == .traditionalChinese ?
-                                "手槍瞄具已進一步放大為標準W型照門與準星。瞄準時將準星上緣切在6環正中間位置，此時擊發即可正中10.9中心。" :
-                                "Pistol W-sight is significantly enlarged. Align the top of the post with the middle of ring 6 for a 10.9 center hit."
+                                "• 手槍（三點一線）：前方的凸起（準星）對齊後方缺口（照門）中央。將準星切在黑色靶心正下方一點點，即可擊中高分。\n\n• 步槍（同心圓）：透過後方圓孔（覘孔）看前方圓環。將黑心靶完整套在圓環正中間（留一圈均勻的白邊）即可。" :
+                                "• Pistol (3-Point Alignment): Align the front sight post centrally inside the rear sight notch. Cut the top of the post just below the black bullseye to hit the high-score.\n\n• Rifle (Concentric Circles): Look through the rear peep hole to the front aperture ring. Center the black bullseye target completely within the front ring, leaving a uniform white border around it."
                         )
                         instructionItem(
-                            title: language == .traditionalChinese ? "10米步槍（同心圓覘孔包覆4環）" : "10m Rifle (Concentric Ring 4 Clearance)",
+                            title: language == .traditionalChinese ? "📊 成績與紀錄" : "📊 Scores & Match Records",
                             desc: language == .traditionalChinese ?
-                                "步槍瞄準具由外到內的第二個同心圓（78pt）略大於4環黑心直徑（65pt），瞄準時黑心周圍會留有一圈均勻白光環，方便同心校準。" :
-                                "The second concentric circle from outside (78pt) is sized just larger than the black ring 4 bullseye (65pt), providing a balanced ring of light for diopter centering."
-                        )
-                        instructionItem(
-                            title: language == .traditionalChinese ? "方位偏差箭頭與結束記錄" : "Direction Arrows & Match Records",
-                            desc: language == .traditionalChinese ?
-                                "在成績單中，每一發子彈皆會標註偏差方位小箭頭與點鐘方向（例如 10.4 ↗ 2點鐘）。點擊「結束」按鈕可將整場成績永久保存至「歷史記錄」隨時查閱。" :
-                                "Each shot in the scorecard indicates its exact deviation angle via arrow and clock direction. Tap 'Finish' to save the complete match into History."
+                                "• 打完每一發後，成績單會標示子彈的偏差方向（例如：偏向 2 點鐘方向 ↗）。\n• 點擊「結束」按鈕，即可將整場成績存入歷史記錄。" :
+                                "• After each shot, the scorecard indicates its exact deviation direction (e.g. drifting toward 2 o'clock ↗).\n• Tap the 'Finish' button anytime to save your complete match to History."
                         )
                     }
                     .padding(18)
