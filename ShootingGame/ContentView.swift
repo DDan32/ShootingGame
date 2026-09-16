@@ -18,17 +18,15 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 struct L10n {
     let lang: AppLanguage
 
-    var appTitle: String { lang == .traditionalChinese ? "10米奧運射擊" : "10m Olympic Shooting" }
-    var appSubtitle: String { lang == .traditionalChinese ? "專業精準射擊模擬器" : "Precision Shooting Simulator" }
-    var startButton: String { lang == .traditionalChinese ? "開始射擊" : "Start Shooting" }
-    var instructionsButton: String { lang == .traditionalChinese ? "操作說明" : "How to Play" }
-    var historyButton: String { lang == .traditionalChinese ? "歷史記錄" : "Match History" }
-    var languageLabel: String { lang == .traditionalChinese ? "語言 / Language" : "Language" }
+    var appTitle: String { lang == .traditionalChinese ? "1 0 米 射 擊" : "10M SHOOTING" }
+    var appSubtitle: String { lang == .traditionalChinese ? "射 擊 模 擬 器" : "SHOOTING SIMULATOR" }
+    var startButton: String { lang == .traditionalChinese ? "開 始 射 擊" : "Start Shooting" }
+    var instructionsButton: String { lang == .traditionalChinese ? "操 作 說 明" : "How to Play" }
+    var historyButton: String { lang == .traditionalChinese ? "歷 史 記 錄" : "Match History" }
+    var languageLabel: String { lang == .traditionalChinese ? "語 言 / Language" : "語 言 / Language" }
 
     var pistolMode: String { lang == .traditionalChinese ? "10米手槍" : "10m Pistol" }
     var rifleMode: String { lang == .traditionalChinese ? "10米步槍" : "10m Rifle" }
-    var pistolSub: String { lang == .traditionalChinese ? "大W瞄具 · 6環光隙" : "Large W-Sight · Ring 6 Gap" }
-    var rifleSub: String { lang == .traditionalChinese ? "同心圓 · 覘孔包覆4環" : "Diopter · Ring 4 Clearance" }
 
     var lastShot: String { lang == .traditionalChinese ? "上一發" : "Last" }
     var seriesSubtotal: String { lang == .traditionalChinese ? "當前組" : "Series" }
@@ -199,6 +197,81 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Dynamic Olympic Metallic Ripples Background (向量精準同心波紋，波紋間距細密精緻)
+struct OlympicMetallicRipplesBackground: View {
+    let logoCenter: CGPoint
+
+    var body: some View {
+        Canvas { context, size in
+            let center = logoCenter.x > 0 ? logoCenter : CGPoint(x: size.width / 2, y: size.height * 0.22)
+            let maxRadius = sqrt(size.width * size.width + size.height * size.height)
+
+            // 1. 底層深邃午夜海軍藍
+            context.fill(
+                Path(CGRect(origin: .zero, size: size)),
+                with: .color(Color(red: 0.04, green: 0.07, blue: 0.15))
+            )
+
+            // 2. 自 Logo 中心發散的金色漸層光暈
+            let radialGlow = Gradient(
+                colors: [
+                    Color(red: 0.98, green: 0.86, blue: 0.50).opacity(0.85),
+                    Color(red: 0.85, green: 0.68, blue: 0.32).opacity(0.55),
+                    Color(red: 0.50, green: 0.38, blue: 0.18).opacity(0.35),
+                    Color(red: 0.14, green: 0.23, blue: 0.44).opacity(0.60),
+                    Color(red: 0.04, green: 0.07, blue: 0.15).opacity(0.95)
+                ]
+            )
+            context.fill(
+                Path(CGRect(origin: .zero, size: size)),
+                with: .radialGradient(radialGlow, center: center, startRadius: 15, endRadius: size.width * 0.95)
+            )
+
+            // 3. 幾何精確細緻同心金屬微波紋路（波紋寬度變細、間距縮小為 9pt，更細膩密緻）
+            var r: CGFloat = 80.0
+            while r < maxRadius {
+                let t = r / maxRadius
+                let wave = sin(Double(r) * 0.08) * 0.5 + 0.5
+
+                let goldWeight = max(0.0, 1.0 - t * 1.8)
+                let blueWeight = min(1.0, t * 1.5)
+
+                let red = (0.95 * goldWeight + 0.25 * blueWeight) * (0.85 + 0.15 * wave)
+                let green = (0.82 * goldWeight + 0.38 * blueWeight) * (0.85 + 0.15 * wave)
+                let blue = (0.45 * goldWeight + 0.70 * blueWeight) * (0.85 + 0.15 * wave)
+                let alpha = (0.22 + 0.25 * wave) * (1.0 - t * 0.45)
+
+                let path = Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2))
+                // 波紋細度收窄：1.2pt ~ 1.8pt
+                let lineWidth = 1.2 + 0.8 * (1.0 - t)
+                context.stroke(
+                    path,
+                    with: .color(Color(red: red, green: green, blue: blue).opacity(alpha)),
+                    lineWidth: lineWidth
+                )
+
+                r += 9.0 // 間距由 16pt 縮小為 9pt，呈現更細密的同心金屬波紋
+            }
+
+            // 4. 微細金屬磨砂質感紋理
+            var y: CGFloat = 0
+            while y < size.height {
+                let linePath = Path { p in
+                    p.move(to: CGPoint(x: 0, y: y))
+                    p.addLine(to: CGPoint(x: size.width, y: y))
+                }
+                context.stroke(
+                    linePath,
+                    with: .color(Color(red: 0.9, green: 0.8, blue: 0.6).opacity(0.025)),
+                    lineWidth: 1.0
+                )
+                y += 4.0
+            }
+        }
+        .drawingGroup()
+    }
+}
+
 // MARK: - Main Menu View (開始、操作說明、歷史記錄)
 struct MainMenuView: View {
     @Binding var language: AppLanguage
@@ -206,49 +279,145 @@ struct MainMenuView: View {
     let onShowInstructions: () -> Void
     let onShowHistory: () -> Void
 
+    @State private var logoCenterInScreen: CGPoint = .zero
+
     private var l10n: L10n { L10n(lang: language) }
 
     var body: some View {
         ZStack {
-            Color(red: 0.93, green: 0.86, blue: 0.70).ignoresSafeArea()
+            // 背景：向量級極致清晰的金色到深藍同心金屬波紋，保證 100% 以 Logo 為幾何圓心同心平行發散
+            OlympicMetallicRipplesBackground(logoCenter: logoCenterInScreen)
+                .ignoresSafeArea()
 
-            VStack(spacing: 20) {
-                Spacer()
-
-                // Official ISSF Logo & Branding
+            VStack(spacing: 0) {
+                // 上部主視覺 Logo 與標題區域（固定垂直頂距與固定尺寸，切換中英文絕不位移）
                 VStack(spacing: 12) {
-                    Image("ISSFLogo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 140, height: 140)
-                        .padding(8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18)
-                                .fill(Color.white.opacity(0.88))
-                                .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 3)
-                        )
+                    ZStack {
+                        // 金色與科技藍雙色漫射外暈
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        Color(red: 1.0, green: 0.88, blue: 0.50).opacity(0.40),
+                                        Color(red: 0.20, green: 0.55, blue: 0.95).opacity(0.18),
+                                        Color.clear
+                                    ],
+                                    center: .center,
+                                    startRadius: 40,
+                                    endRadius: 115
+                                )
+                            )
+                            .frame(width: 215, height: 215)
 
-                    Text(l10n.appTitle)
-                        .font(.system(size: 28, weight: .black, design: .rounded))
-                        .foregroundColor(Color(red: 0.12, green: 0.12, blue: 0.12))
+                        // 官方奧運會徽標誌（精緻金屬浮雕質感 + 磨砂金屬光澤，同心平行）
+                        ZStack {
+                            Image("OlympicEmblem")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 154, height: 154)
 
-                    VStack(spacing: 2) {
-                        Text(language == .traditionalChinese ? "國際射擊運動聯盟" : "International Shooting Sport Federation")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundColor(Color(red: 0.15, green: 0.32, blue: 0.62))
-                        Text(l10n.appSubtitle)
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundColor(Color.black.opacity(0.55))
+                            // 金屬高光與磨砂質感疊層
+                            Image("MetallicMatteTexture")
+                                .resizable(resizingMode: .tile)
+                                .opacity(0.25)
+                                .blendMode(.colorDodge)
+
+                            // 雙層立體金屬光澤高光漸層外圈
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 1.0, green: 0.96, blue: 0.78),
+                                            Color(red: 0.85, green: 0.68, blue: 0.35),
+                                            Color(red: 0.45, green: 0.32, blue: 0.15),
+                                            Color(red: 0.90, green: 0.75, blue: 0.40)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 3.5
+                                )
+
+                            Circle()
+                                .stroke(Color.white.opacity(0.4), lineWidth: 1.0)
+                                .padding(2)
+                        }
+                        .frame(width: 154, height: 154)
+                        .clipShape(Circle())
+                        .shadow(color: Color.black.opacity(0.7), radius: 18, x: 0, y: 8)
                     }
+                    .background(
+                        GeometryReader { geo in
+                            let frame = geo.frame(in: .global)
+                            Color.clear.preference(
+                                key: LogoCenterPreferenceKey.self,
+                                value: CGPoint(x: frame.midX, y: frame.midY)
+                            )
+                        }
+                    )
+
+                    // 主標題：10米射擊 / 10m SHOOTING（固定高 48pt，切換語言不跳動）
+                    ZStack {
+                        // 霓虹發光外邊框陰影層（Cyan / Electric Blue Glow）
+                        Text(l10n.appTitle)
+                            .font(language == .traditionalChinese
+                                  ? .custom("DelaGothicOne-Regular", size: 36)
+                                  : .custom("Orbitron-Bold", size: 28))
+                            .foregroundColor(Color(red: 0.0, green: 0.95, blue: 0.85).opacity(0.75))
+                            .blur(radius: 8)
+                            .offset(y: 1)
+
+                        // 核心發光文字：冰藍過渡至純白，並帶有電光青藍描邊
+                        Text(l10n.appTitle)
+                            .font(language == .traditionalChinese
+                                  ? .custom("DelaGothicOne-Regular", size: 36)
+                                  : .custom("Orbitron-Bold", size: 28))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white,
+                                        Color(red: 0.85, green: 0.98, blue: 1.0),
+                                        Color(red: 0.40, green: 0.88, blue: 0.95)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .shadow(color: Color(red: 0.0, green: 0.85, blue: 0.95).opacity(0.9), radius: 4, x: 0, y: 0)
+                            .shadow(color: Color.black.opacity(0.7), radius: 6, x: 0, y: 3)
+                    }
+                    .frame(height: 48)
+
+                    // 副標題：射擊模擬器 / SHOOTING SIMULATOR（固定高 26pt，切換語言不跳動）
+                    Text(l10n.appSubtitle)
+                        .font(language == .traditionalChinese
+                              ? .custom("DelaGothicOne-Regular", size: 17)
+                              : .custom("Orbitron-Bold", size: 14))
+                        .tracking(language == .traditionalChinese ? 3.0 : 2.0)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.92, blue: 0.65),
+                                    Color(red: 0.85, green: 0.72, blue: 0.40)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .shadow(color: Color(red: 0.95, green: 0.75, blue: 0.30).opacity(0.7), radius: 5, x: 0, y: 0)
+                        .shadow(color: Color.black.opacity(0.65), radius: 4, x: 0, y: 2)
+                        .frame(height: 26)
                 }
+                .padding(.top, 18)
 
-                Spacer()
+                Spacer(minLength: 20)
 
-                // Language Segmented Control
-                VStack(spacing: 6) {
+                // 語言切換選單（Language Segmented Control，切換無跳躍）
+                VStack(spacing: 5) {
                     Text(l10n.languageLabel)
-                        .font(.system(size: 12.5, weight: .bold))
-                        .foregroundColor(Color.black.opacity(0.55))
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundColor(Color.white.opacity(0.85))
+                        .shadow(color: Color.black.opacity(0.5), radius: 2, x: 0, y: 1)
                     Picker("Language", selection: $language) {
                         ForEach(AppLanguage.allCases) { lang in
                             Text(lang.rawValue).tag(lang)
@@ -256,67 +425,174 @@ struct MainMenuView: View {
                     }
                     .pickerStyle(.segmented)
                     .frame(maxWidth: 220)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.16)))
                 }
+                .padding(.bottom, 16)
 
-                // Menu Buttons
-                VStack(spacing: 11) {
-                    // Start Button
+                // 金屬磨砂質感按鈕群組（固定高度排列）
+                VStack(spacing: 12) {
+                    // Start Button (主按鈕：深邃寶藍鈦金屬 + 微磨砂紋理 + 金色微光高光描邊)
                     Button(action: onStart) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "scope")
-                                .font(.system(size: 18, weight: .bold))
-                            Text(l10n.startButton)
-                                .font(.system(size: 19, weight: .heavy, design: .rounded))
+                        ZStack {
+                            // 金屬磨砂紋理覆蓋層
+                            Image("MetallicMatteTexture")
+                                .resizable(resizingMode: .tile)
+                                .opacity(0.18)
+                                .blendMode(.overlay)
+
+                            HStack(spacing: 10) {
+                                Image(systemName: "scope")
+                                    .font(.system(size: 19, weight: .heavy))
+                                Text(l10n.startButton)
+                                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                            }
+                            .foregroundColor(.white)
+                            .shadow(color: Color.black.opacity(0.5), radius: 2, x: 0, y: 1)
                         }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: 260)
-                        .padding(.vertical, 13)
+                        .frame(maxWidth: 280)
+                        .frame(height: 52)
                         .background(
                             LinearGradient(
-                                colors: [Color(red: 0.2, green: 0.45, blue: 0.85), Color(red: 0.12, green: 0.3, blue: 0.65)],
+                                colors: [
+                                    Color(red: 0.22, green: 0.42, blue: 0.72),
+                                    Color(red: 0.11, green: 0.22, blue: 0.45)
+                                ],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
                         )
-                        .cornerRadius(12)
-                        .shadow(color: Color.black.opacity(0.25), radius: 5, x: 0, y: 3)
+                        .cornerRadius(15)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 1.0, green: 0.92, blue: 0.70).opacity(0.80),
+                                            Color(red: 0.30, green: 0.50, blue: 0.85).opacity(0.30)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 1.3
+                                )
+                        )
+                        .shadow(color: Color(red: 0.08, green: 0.16, blue: 0.35).opacity(0.6), radius: 8, x: 0, y: 4)
                     }
                     .buttonStyle(PressableButtonStyle())
 
-                    // Match History Button
+                    // Match History Button (啞光拉絲銀金屬 + 磨砂紋理 + 精密刻線)
                     Button(action: onShowHistory) {
-                        HStack(spacing: 7) {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text(l10n.historyButton)
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                        ZStack {
+                            // 金屬磨砂紋理覆蓋層
+                            Image("MetallicMatteTexture")
+                                .resizable(resizingMode: .tile)
+                                .opacity(0.22)
+                                .blendMode(.multiply)
+
+                            HStack(spacing: 9) {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .font(.system(size: 16.5, weight: .bold))
+                                Text(l10n.historyButton)
+                                    .font(.system(size: 15.5, weight: .bold, design: .rounded))
+                            }
+                            .foregroundColor(Color(red: 0.14, green: 0.18, blue: 0.26))
                         }
-                        .foregroundColor(Color(red: 0.15, green: 0.28, blue: 0.45))
-                        .frame(maxWidth: 260)
-                        .padding(.vertical, 11)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.85)))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.15), lineWidth: 1.2))
+                        .frame(maxWidth: 280)
+                        .frame(height: 49)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.93, green: 0.94, blue: 0.96),
+                                    Color(red: 0.78, green: 0.81, blue: 0.85)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .cornerRadius(15)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [Color.white, Color(red: 0.7, green: 0.75, blue: 0.82)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 1.2
+                                )
+                        )
+                        .shadow(color: Color.black.opacity(0.3), radius: 6, x: 0, y: 3)
                     }
                     .buttonStyle(PressableButtonStyle())
 
-                    // Instructions Button
+                    // Instructions Button (陽極氧化啞光深灰金屬 + 磨砂質感)
                     Button(action: onShowInstructions) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "info.circle.fill")
-                            Text(l10n.instructionsButton)
-                                .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                        ZStack {
+                            Image("MetallicMatteTexture")
+                                .resizable(resizingMode: .tile)
+                                .opacity(0.25)
+                                .blendMode(.overlay)
+
+                            HStack(spacing: 8) {
+                                Image(systemName: "info.circle.fill")
+                                    .font(.system(size: 15.5, weight: .bold))
+                                Text(l10n.instructionsButton)
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                            }
+                            .foregroundColor(.white)
+                            .shadow(color: Color.black.opacity(0.5), radius: 2, x: 0, y: 1)
                         }
-                        .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.25))
-                        .frame(maxWidth: 260)
-                        .padding(.vertical, 10)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.06)))
+                        .frame(maxWidth: 280)
+                        .frame(height: 48)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.35, green: 0.39, blue: 0.46),
+                                    Color(red: 0.22, green: 0.25, blue: 0.31)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .cornerRadius(15)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.40),
+                                            Color.white.opacity(0.12)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 1.1
+                                )
+                        )
+                        .shadow(color: Color.black.opacity(0.3), radius: 5, x: 0, y: 3)
                     }
                     .buttonStyle(PressableButtonStyle())
                 }
 
-                Spacer()
+                Spacer(minLength: 15)
             }
             .padding(.horizontal, 24)
+        }
+        .onPreferenceChange(LogoCenterPreferenceKey.self) { center in
+            if center != .zero {
+                logoCenterInScreen = center
+            }
+        }
+    }
+}
+
+// MARK: - PreferenceKey for Logo Center Point
+struct LogoCenterPreferenceKey: PreferenceKey {
+    static var defaultValue: CGPoint = .zero
+    static func reduce(value: inout CGPoint, nextValue: () -> CGPoint) {
+        let next = nextValue()
+        if next != .zero {
+            value = next
         }
     }
 }
@@ -552,21 +828,16 @@ struct GameView: View {
     private var modeSelectorRow: some View {
         HStack {
             Button(action: { withAnimation(.easeInOut(duration: 0.2)) { aimMode = .pistol } }) {
-                HStack(spacing: 5) {
+                HStack(spacing: 6) {
                     WNotchShape()
                         .fill(aimMode == .pistol ? Color.black : Color.gray)
                         .frame(width: 26, height: 10)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(l10n.pistolMode)
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(aimMode == .pistol ? .black : Color(white: 0.35))
-                        Text(l10n.pistolSub)
-                            .font(.system(size: 8))
-                            .foregroundColor(aimMode == .pistol ? Color(white: 0.2) : Color(white: 0.45))
-                    }
+                    Text(l10n.pistolMode)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(aimMode == .pistol ? .black : Color(white: 0.35))
                 }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
                 .background(RoundedRectangle(cornerRadius: 6).fill(aimMode == .pistol ? Color.black.opacity(0.09) : Color.clear))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(aimMode == .pistol ? Color.black.opacity(0.35) : Color.clear, lineWidth: 1))
             }
@@ -575,21 +846,16 @@ struct GameView: View {
             Spacer()
 
             Button(action: { withAnimation(.easeInOut(duration: 0.2)) { aimMode = .rifle } }) {
-                HStack(spacing: 5) {
-                    VStack(alignment: .trailing, spacing: 1) {
-                        Text(l10n.rifleMode)
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(aimMode == .rifle ? .black : Color(white: 0.35))
-                        Text(l10n.rifleSub)
-                            .font(.system(size: 8))
-                            .foregroundColor(aimMode == .rifle ? Color(white: 0.2) : Color(white: 0.45))
-                    }
+                HStack(spacing: 6) {
+                    Text(l10n.rifleMode)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(aimMode == .rifle ? .black : Color(white: 0.35))
                     Circle()
                         .stroke(aimMode == .rifle ? Color.black : Color.gray, lineWidth: 2)
                         .frame(width: 17, height: 17)
                 }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
                 .background(RoundedRectangle(cornerRadius: 6).fill(aimMode == .rifle ? Color.black.opacity(0.09) : Color.clear))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(aimMode == .rifle ? Color.black.opacity(0.35) : Color.clear, lineWidth: 1))
             }

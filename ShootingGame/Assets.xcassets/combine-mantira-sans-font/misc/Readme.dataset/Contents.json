@@ -1,6 +1,7 @@
 {
-  "colors" : [
+  "data" : [
     {
+      "filename" : "Readme.txt",
       "idiom" : "universal"
     }
   ],
