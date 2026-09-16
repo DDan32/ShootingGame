@@ -34,7 +34,7 @@ struct L10n {
     var seriesSubtotal: String { lang == .traditionalChinese ? "當前組" : "Series" }
     var grandTotal: String { lang == .traditionalChinese ? "大賽總分" : "Total" }
     var shotProgress: String { lang == .traditionalChinese ? "總發數" : "Shots" }
-    var scorecardBtn: String { lang == .traditionalChinese ? "成績單" : "Card" }
+    var scorecardBtn: String { lang == .traditionalChinese ? "計分表" : "Card" }
     var finishBtn: String { lang == .traditionalChinese ? "結束" : "Finish" }
 
     // Mode Selection & Finish Confirmation Dialogs
@@ -58,7 +58,7 @@ struct L10n {
     var backToMenu: String { lang == .traditionalChinese ? "主選單" : "Menu" }
     var resetMatch: String { lang == .traditionalChinese ? "清空" : "Clear" }
 
-    var instructionsTitle: String { lang == .traditionalChinese ? "奧運射擊規則與操作說明" : "Rules & Instructions" }
+    var instructionsTitle: String { lang == .traditionalChinese ? "射擊規則與操作說明" : "Rules & Instructions" }
     var closeButton: String { lang == .traditionalChinese ? "關閉" : "Close" }
 }
 
@@ -1808,7 +1808,7 @@ struct OlympicScorecardView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "list.clipboard.fill")
                         .foregroundColor(Color(red: 0.18, green: 0.35, blue: 0.65))
-                    Text(language == .traditionalChinese ? "奧運射擊記分表" : "Olympic Scorecard")
+                    Text(language == .traditionalChinese ? "計分表" : "Scorecard")
                         .font(.system(size: 16, weight: .black))
                         .foregroundColor(.black)
                 }
@@ -2251,7 +2251,7 @@ enum TutorialStep: Int, CaseIterable, Identifiable {
         case .releaseFire10_9:
             return lang == .traditionalChinese ? "步驟 4：鬆手擊發 · 命中 10.9 滿分！" : "Step 4: Release & Score 10.9!"
         case .viewScorecard:
-            return lang == .traditionalChinese ? "步驟 5：查看【成績單】偏差分析" : "Step 5: Review Match Scorecard"
+            return lang == .traditionalChinese ? "步驟 5：查看【計分表】偏差分析" : "Step 5: Review Match Scorecard"
         case .finishAndSave:
             return lang == .traditionalChinese ? "步驟 6：點擊【結束】儲存至歷史記錄" : "Step 6: Finish & Save to History"
         }
@@ -2268,7 +2268,7 @@ enum TutorialStep: Int, CaseIterable, Identifiable {
         case .releaseFire10_9:
             return lang == .traditionalChinese ? "4.擊發10.9" : "4.Fire 10.9"
         case .viewScorecard:
-            return lang == .traditionalChinese ? "5.成績單" : "5.Card"
+            return lang == .traditionalChinese ? "5.計分表" : "5.Card"
         case .finishAndSave:
             return lang == .traditionalChinese ? "6.儲存退出" : "6.Save"
         }
@@ -2306,7 +2306,7 @@ enum TutorialStep: Int, CaseIterable, Identifiable {
                 """
         case .viewScorecard:
             return lang == .traditionalChinese ?
-                "• 點擊右上角【成績單】，可隨時檢視各組成績與每發子彈的精確偏差方向（例如：正中 •、偏向 2 點鐘方向 ↗）。" :
+                "• 點擊右上角【計分表】，可隨時檢視各組成績與每發子彈的精確偏差方向（例如：正中 •、偏向 2 點鐘方向 ↗）。" :
                 "• Tap [Card] anytime to review series scores, cumulative totals, and directional deviation for each shot."
         case .finishAndSave:
             return lang == .traditionalChinese ?
@@ -2405,7 +2405,7 @@ struct InstructionsSheetView: View {
                     }
                 }
             }
-            .navigationTitle(language == .traditionalChinese ? "奧運射擊操作說明" : "Instructions & Demo")
+            .navigationTitle(language == .traditionalChinese ? "射擊操作說明" : "Instructions & Demo")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -2728,7 +2728,7 @@ struct InstructionsSheetView: View {
 
                 HStack(spacing: 2) {
                     Image(systemName: "list.clipboard.fill").font(.system(size: 7.5))
-                    Text(language == .traditionalChinese ? "成績單" : "Scores").font(.system(size: 7.5, weight: .bold))
+                    Text(language == .traditionalChinese ? "計分表" : "Scores").font(.system(size: 7.5, weight: .bold))
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 5)
@@ -2968,7 +2968,7 @@ struct InstructionsSheetView: View {
 
             VStack(spacing: 8) {
                 HStack {
-                    Text(language == .traditionalChinese ? "歷史射擊成績單" : "Match Scorecard")
+                    Text(language == .traditionalChinese ? "歷史射擊計分表" : "Match Scorecard")
                         .font(.system(size: 12, weight: .bold))
                     Spacer()
                     Text("")
@@ -3170,7 +3170,7 @@ struct InstructionsSheetView: View {
                     title: language == .traditionalChinese ? "📊 成績與紀錄" : "📊 Scores & Match Records",
                     desc: language == .traditionalChinese ?
                         """
-                        • 打完每一發後，成績單會標示子彈的偏差方向（例如：正中 •、偏向 2 點鐘方向 ↗）。
+                        • 打完每一發後，計分表會標示子彈的偏差方向（例如：正中 •、偏向 2 點鐘方向 ↗）。
                         • 點擊「結束」按鈕，即可選擇儲存成績並存入歷史記錄。
                         """ :
                         """
