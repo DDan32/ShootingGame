@@ -426,8 +426,8 @@ struct MainMenuView: View {
                         // 霓虹發光外邊框陰影層（Cyan / Electric Blue Glow）
                         Text(l10n.appTitle)
                             .font(language == .traditionalChinese
-                                  ? .custom("DelaGothicOne-Regular", size: 36)
-                                  : .custom("Orbitron-Bold", size: 28))
+                                  ? .custom("DelaGothicOne-Regular", size: 50)
+                                  : .custom("Orbitron-Bold", size: 40))
                             .foregroundColor(Color(red: 0.0, green: 0.95, blue: 0.85).opacity(0.75))
                             .blur(radius: 8)
                             .offset(y: 1)
@@ -435,8 +435,8 @@ struct MainMenuView: View {
                         // 核心發光文字：冰藍過渡至純白，並帶有電光青藍描邊
                         Text(l10n.appTitle)
                             .font(language == .traditionalChinese
-                                  ? .custom("DelaGothicOne-Regular", size: 36)
-                                  : .custom("Orbitron-Bold", size: 28))
+                                  ? .custom("DelaGothicOne-Regular", size: 50)
+                                  : .custom("Orbitron-Bold", size: 40))
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [
@@ -456,8 +456,8 @@ struct MainMenuView: View {
                     // 副標題：射擊模擬器 / SHOOTING SIMULATOR（固定高 26pt，切換語言不跳動）
                     Text(l10n.appSubtitle)
                         .font(language == .traditionalChinese
-                              ? .custom("DelaGothicOne-Regular", size: 17)
-                              : .custom("Orbitron-Bold", size: 14))
+                              ? .custom("DelaGothicOne-Regular", size: 30)
+                              : .custom("Orbitron-Bold", size: 20))
                         .tracking(language == .traditionalChinese ? 3.0 : 2.0)
                         .foregroundStyle(
                             LinearGradient(
