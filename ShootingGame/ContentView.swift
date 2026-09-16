@@ -35,6 +35,15 @@ struct L10n {
     var scorecardBtn: String { lang == .traditionalChinese ? "成績單" : "Card" }
     var finishBtn: String { lang == .traditionalChinese ? "結束" : "Finish" }
 
+    // Mode Selection & Finish Confirmation Dialogs
+    var selectWeaponTitle: String { lang == .traditionalChinese ? "選擇射擊項目" : "Select Event" }
+    var selectWeaponMessage: String { lang == .traditionalChinese ? "請選擇本次要練習的射擊項目：" : "Please select the event for this session:" }
+    var finishTitle: String { lang == .traditionalChinese ? "結束本場射擊" : "Finish Match" }
+    var finishMessage: String { lang == .traditionalChinese ? "請選擇如何處理目前的射擊成績：" : "Choose how to handle your match results:" }
+    var saveAndExit: String { lang == .traditionalChinese ? "儲存成績並結束" : "Save & Finish" }
+    var exitWithoutSaving: String { lang == .traditionalChinese ? "退出不儲存" : "Exit Without Saving" }
+    var cancel: String { lang == .traditionalChinese ? "取消" : "Cancel" }
+
     var maxShotsLabel: String { lang == .traditionalChinese ? "靶面彈印:" : "Target Marks:" }
     var fiveShots: String { lang == .traditionalChinese ? "5 發" : "5 Shots" }
     var tenShots: String { lang == .traditionalChinese ? "10 發" : "10 Shots" }
@@ -608,7 +617,8 @@ struct GameView: View {
     @State private var visibleTargetShots: [ShotRecord] = []
     @State private var lastShotScore: Double? = nil
     @State private var showScorecard: Bool = false
-    @State private var showFinishAlert: Bool = false
+    @State private var showFinishDialog: Bool = false
+    @State private var showWeaponSelectDialog: Bool = true
 
     // Aiming State
     @State private var isHoldingBreath: Bool = false
@@ -725,6 +735,124 @@ struct GameView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 8)
             }
+
+            // 自訂正中央置中選擇視窗（置中顯示、精美金屬雙色質感）
+            if showWeaponSelectDialog {
+                Color.black.opacity(0.48)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+
+                VStack(spacing: 18) {
+                    VStack(spacing: 6) {
+                        Image(systemName: "scope")
+                            .font(.system(size: 34, weight: .semibold))
+                            .foregroundColor(Color(red: 0.88, green: 0.68, blue: 0.22))
+
+                        Text(l10n.selectWeaponTitle)
+                            .font(.system(size: 20, weight: .black))
+                            .foregroundColor(.black)
+
+                        Text(l10n.selectWeaponMessage)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(Color.black.opacity(0.65))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 8)
+                    }
+
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            aimMode = .pistol
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                showWeaponSelectDialog = false
+                            }
+                        }) {
+                            HStack(spacing: 12) {
+                                WNotchShape()
+                                    .fill(Color.white)
+                                    .frame(width: 24, height: 10)
+                                Text(l10n.pistolMode)
+                                    .font(.system(size: 16, weight: .heavy))
+                                Spacer()
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.system(size: 18))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(LinearGradient(
+                                        colors: [Color(red: 0.22, green: 0.28, blue: 0.40), Color(red: 0.12, green: 0.16, blue: 0.25)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                            )
+                            .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 3)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: {
+                            aimMode = .rifle
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                showWeaponSelectDialog = false
+                            }
+                        }) {
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .stroke(Color.white, lineWidth: 2.2)
+                                    .frame(width: 17, height: 17)
+                                Text(l10n.rifleMode)
+                                    .font(.system(size: 16, weight: .heavy))
+                                Spacer()
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.system(size: 18))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(LinearGradient(
+                                        colors: [Color(red: 0.18, green: 0.35, blue: 0.32), Color(red: 0.10, green: 0.22, blue: 0.20)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                            )
+                            .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 3)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 22)
+                .padding(.vertical, 22)
+                .frame(maxWidth: 310)
+                .background(
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(Color(red: 0.98, green: 0.97, blue: 0.95))
+                        .shadow(color: Color.black.opacity(0.35), radius: 28, x: 0, y: 14)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color(red: 0.88, green: 0.72, blue: 0.38), Color(red: 0.65, green: 0.50, blue: 0.25)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .transition(.scale(scale: 0.9).combined(with: .opacity))
+                .zIndex(100)
+            }
         }
         .sheet(isPresented: $showScorecard) {
             OlympicScorecardView(
@@ -733,13 +861,21 @@ struct GameView: View {
                 grandTotal: grandTotalScore
             ) { showScorecard = false }
         }
-        .alert(language == .traditionalChinese ? "確定結束這場射擊？" : "End and Save this Match?", isPresented: $showFinishAlert) {
-            Button(language == .traditionalChinese ? "取消" : "Cancel", role: .cancel) {}
-            Button(language == .traditionalChinese ? "確認結束並記錄" : "Finish & Save", role: .destructive) {
+        // 結束時選擇退出不儲存、儲存、取消
+        .confirmationDialog(
+            l10n.finishTitle,
+            isPresented: $showFinishDialog,
+            titleVisibility: .visible
+        ) {
+            Button(l10n.saveAndExit) {
                 finishAndSaveMatch()
             }
+            Button(l10n.exitWithoutSaving, role: .destructive) {
+                onExit()
+            }
+            Button(l10n.cancel, role: .cancel) {}
         } message: {
-            Text(language == .traditionalChinese ? "目前的 \(allMatchShots.count) 發總成績將永久儲存至「歷史記錄」中。" : "Your \(allMatchShots.count) shots will be permanently saved to Match History.")
+            Text(l10n.finishMessage)
         }
     }
 
@@ -756,7 +892,13 @@ struct GameView: View {
     // MARK: - Olympic Dashboard Header (Includes "Finish" button)
     private var olympicDashboardHeader: some View {
         HStack(spacing: 5) {
-            Button(action: onExit) {
+            Button(action: {
+                if allMatchShots.isEmpty {
+                    onExit()
+                } else {
+                    showFinishDialog = true
+                }
+            }) {
                 HStack(spacing: 2) {
                     Image(systemName: "chevron.left")
                     Text(l10n.backToMenu)
@@ -793,7 +935,7 @@ struct GameView: View {
                 if allMatchShots.isEmpty {
                     onExit()
                 } else {
-                    showFinishAlert = true
+                    showFinishDialog = true
                 }
             }) {
                 HStack(spacing: 2) {
@@ -824,42 +966,43 @@ struct GameView: View {
         }
     }
 
-    // MARK: - Mode Selector Row
+    // MARK: - Mode Badge Indicator Row (已鎖定項目，遊戲中不可更換，直到退出重新開始)
     private var modeSelectorRow: some View {
         HStack {
-            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { aimMode = .pistol } }) {
-                HStack(spacing: 6) {
+            HStack(spacing: 7) {
+                if aimMode == .pistol {
                     WNotchShape()
-                        .fill(aimMode == .pistol ? Color.black : Color.gray)
-                        .frame(width: 26, height: 10)
+                        .fill(Color.black)
+                        .frame(width: 24, height: 10)
                     Text(l10n.pistolMode)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(aimMode == .pistol ? .black : Color(white: 0.35))
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundColor(.black)
+                } else {
+                    Circle()
+                        .stroke(Color.black, lineWidth: 2)
+                        .frame(width: 15, height: 15)
+                    Text(l10n.rifleMode)
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundColor(.black)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(RoundedRectangle(cornerRadius: 6).fill(aimMode == .pistol ? Color.black.opacity(0.09) : Color.clear))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(aimMode == .pistol ? Color.black.opacity(0.35) : Color.clear, lineWidth: 1))
+
+                // 標示鎖定狀態圖示
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(Color.black.opacity(0.45))
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(Color.black.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color.black.opacity(0.2), lineWidth: 1)
+            )
 
             Spacer()
-
-            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { aimMode = .rifle } }) {
-                HStack(spacing: 6) {
-                    Text(l10n.rifleMode)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(aimMode == .rifle ? .black : Color(white: 0.35))
-                    Circle()
-                        .stroke(aimMode == .rifle ? Color.black : Color.gray, lineWidth: 2)
-                        .frame(width: 17, height: 17)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(RoundedRectangle(cornerRadius: 6).fill(aimMode == .rifle ? Color.black.opacity(0.09) : Color.clear))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(aimMode == .rifle ? Color.black.opacity(0.35) : Color.clear, lineWidth: 1))
-            }
-            .buttonStyle(.plain)
         }
     }
 
