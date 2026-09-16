@@ -47,6 +47,7 @@ struct L10n {
     var cancel: String { lang == .traditionalChinese ? "取消" : "Cancel" }
 
     var maxShotsLabel: String { lang == .traditionalChinese ? "靶面彈印:" : "Target Marks:" }
+    var oneShot: String { lang == .traditionalChinese ? "1 發" : "1 Shot" }
     var fiveShots: String { lang == .traditionalChinese ? "5 發" : "5 Shots" }
     var tenShots: String { lang == .traditionalChinese ? "10 發" : "10 Shots" }
 
@@ -703,27 +704,32 @@ struct GameView: View {
         currentSeriesShots.reduce(0.0) { $0 + $1.score }
     }
 
+    private var priorSeriesSubtotal: Double? {
+        guard currentSeriesNumber > 1 else { return nil }
+        let priorIndex = currentSeriesNumber - 2
+        let start = priorIndex * 10
+        let end = min(start + 10, allMatchShots.count)
+        guard start < allMatchShots.count else { return nil }
+        return allMatchShots[start..<end].reduce(0.0) { $0 + $1.score }
+    }
+
     private var grandTotalScore: Double {
         allMatchShots.reduce(0.0) { $0 + $1.score }
     }
 
     var body: some View {
         ZStack {
-            Color(red: 0.93, green: 0.86, blue: 0.70).ignoresSafeArea()
-
-            VStack(spacing: 6) {
-                // Top Header: Back, Olympic Dashboard, Scorecard & Finish
+            VStack(spacing: 10) {
+                // Top Header: Back, Mode Badge, 12/60, Scorecard & Finish
                 olympicDashboardHeader
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 6)
+                    .zIndex(10)
+
+                // S1 S2 & Grand Total (Enlarged, Left) + Real-time Target Magnifier (Right)
+                dashboardScoreAndMagnifierRow
+                    .padding(.horizontal, 12)
                     .padding(.top, 4)
-
-                // Mode Selector
-                modeSelectorRow
-                    .padding(.horizontal, 14)
-
-                // Capacity Picker & Progress
-                capacityPickerRow
-                    .padding(.horizontal, 16)
 
                 Spacer(minLength: 2)
 
@@ -917,30 +923,48 @@ struct GameView: View {
                 .transition(.scale(scale: 0.9).combined(with: .opacity))
                 .zIndex(100)
             }
-        }
-        .sheet(isPresented: $showScorecard) {
-            OlympicScorecardView(
-                language: language,
-                allShots: allMatchShots,
-                grandTotal: grandTotalScore
-            ) { showScorecard = false }
-        }
-        // 結束時選擇退出不儲存、儲存、取消
-        .confirmationDialog(
-            l10n.finishTitle,
-            isPresented: $showFinishDialog,
-            titleVisibility: .visible
-        ) {
-            Button(l10n.saveAndExit) {
-                finishAndSaveMatch()
+
+            // 自訂成績單全螢幕彈窗 (直接置於 ZStack，無空 overlay 攔截點擊)
+            if showScorecard {
+                ZStack {
+                    Color.black.opacity(0.55)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.2)) { showScorecard = false }
+                        }
+
+                    OlympicScorecardView(
+                        language: language,
+                        allShots: allMatchShots,
+                        grandTotal: grandTotalScore
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.2)) { showScorecard = false }
+                    }
+                    .frame(maxWidth: 360, maxHeight: 600)
+                    .cornerRadius(16)
+                    .shadow(color: Color.black.opacity(0.35), radius: 20, x: 0, y: 8)
+                    .padding(16)
+                    .transition(.scale(scale: 0.92).combined(with: .opacity))
+                }
+                .zIndex(200)
             }
-            Button(l10n.exitWithoutSaving, role: .destructive) {
-                onExit()
+
+            // 自訂結束比賽確認視窗 (直接置於 ZStack，無空 overlay 攔截點擊)
+            if showFinishDialog {
+                ZStack {
+                    Color.black.opacity(0.55)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.2)) { showFinishDialog = false }
+                        }
+
+                    finishConfirmationOverlay
+                        .transition(.scale(scale: 0.92).combined(with: .opacity))
+                }
+                .zIndex(250)
             }
-            Button(l10n.cancel, role: .cancel) {}
-        } message: {
-            Text(l10n.finishMessage)
         }
+        .background(Color(red: 0.93, green: 0.86, blue: 0.70).ignoresSafeArea())
         .onPreferenceChange(LogoCenterPreferenceKey.self) { center in
             if center != .zero {
                 targetCenterInScreen = center
@@ -951,16 +975,16 @@ struct GameView: View {
     private var visualSightOffsetY: CGFloat {
         switch aimMode {
         case .pistol:
-            // 瞄準在 6 環正中間 (距離中心 0.55 * targetRadius，加上瞄具自身半高)
-            return targetRadius * 0.55 + 21.0
+            // 手槍瞄準點微調至 5 環與 6 環之間（約 78.0pt）
+            return 78.0
         case .rifle:
             return 0.0
         }
     }
 
-    // MARK: - Olympic Dashboard Header (Includes "Finish" button)
+    // MARK: - Olympic Dashboard Header (Back, Mode Badge, Shot Count, Scorecard & Finish)
     private var olympicDashboardHeader: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 8) {
             Button(action: {
                 if allMatchShots.isEmpty {
                     onExit()
@@ -968,136 +992,342 @@ struct GameView: View {
                     showFinishDialog = true
                 }
             }) {
-                HStack(spacing: 2) {
+                HStack(spacing: 3) {
                     Image(systemName: "chevron.left")
                     Text(l10n.backToMenu)
                 }
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(Color.black.opacity(0.75))
-                .padding(.horizontal, 6)
+                .font(.system(size: 11.5, weight: .bold))
+                .foregroundColor(Color.black.opacity(0.8))
+                .padding(.horizontal, 8)
                 .padding(.vertical, 5)
                 .background(Capsule().fill(Color.black.opacity(0.08)))
             }
             .buttonStyle(.plain)
 
-            Spacer()
-
-            scoreItem(title: l10n.lastShot, value: lastShotScore != nil ? String(format: "%.1f", lastShotScore!) : "-")
-            scoreItem(title: "S\(currentSeriesNumber)", value: String(format: "%.1f", currentSeriesSubtotal))
-            scoreItem(title: l10n.grandTotal, value: String(format: "%.1f", grandTotalScore), highlight: true)
-
-            // Scorecard Button
-            Button(action: { showScorecard = true }) {
-                VStack(spacing: 1) {
-                    Image(systemName: "list.clipboard.fill").font(.system(size: 12))
-                    Text(l10n.scorecardBtn).font(.system(size: 9, weight: .bold))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color(red: 0.18, green: 0.35, blue: 0.65)))
-            }
-            .buttonStyle(.plain)
-
-            // Finish Button (結束)
-            Button(action: {
-                if allMatchShots.isEmpty {
-                    onExit()
-                } else {
-                    showFinishDialog = true
-                }
-            }) {
-                HStack(spacing: 2) {
-                    Image(systemName: "flag.checkered")
-                    Text(l10n.finishBtn)
-                }
-                .font(.system(size: 11, weight: .heavy))
-                .foregroundColor(.white)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 5)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color(red: 0.85, green: 0.25, blue: 0.15)))
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private func scoreItem(title: String, value: String, highlight: Bool = false) -> some View {
-        VStack(spacing: 2) {
-            Text(title)
-                .font(.system(size: 8.5, weight: .semibold))
-                .foregroundColor(Color.black.opacity(0.6))
-            Text(value)
-                .font(.system(size: 12.5, weight: .bold, design: .monospaced))
-                .foregroundColor(highlight ? Color(red: 0.9, green: 0.15, blue: 0.05) : Color.black)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 2)
-                .background(RoundedRectangle(cornerRadius: 4).fill(highlight ? Color.yellow.opacity(0.35) : Color.white.opacity(0.75)))
-        }
-    }
-
-    // MARK: - Mode Badge Indicator Row (已鎖定項目，遊戲中不可更換，直到退出重新開始)
-    private var modeSelectorRow: some View {
-        HStack {
-            HStack(spacing: 7) {
+            // Mode Badge (10m Pistol / 10m Rifle Locked)
+            HStack(spacing: 5) {
                 if aimMode == .pistol {
                     WNotchShape()
                         .fill(Color.black)
-                        .frame(width: 24, height: 10)
+                        .frame(width: 18, height: 8)
                     Text(l10n.pistolMode)
-                        .font(.system(size: 13, weight: .black))
-                        .foregroundColor(.black)
+                        .font(.system(size: 11.5, weight: .black))
                 } else {
                     Circle()
-                        .stroke(Color.black, lineWidth: 2)
-                        .frame(width: 15, height: 15)
+                        .stroke(Color.black, lineWidth: 1.8)
+                        .frame(width: 12, height: 12)
                     Text(l10n.rifleMode)
-                        .font(.system(size: 13, weight: .black))
-                        .foregroundColor(.black)
+                        .font(.system(size: 11.5, weight: .black))
                 }
-
-                // 標示鎖定狀態圖示
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 8))
                     .foregroundColor(Color.black.opacity(0.45))
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 7)
             .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(Color.black.opacity(0.08))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 7)
-                    .stroke(Color.black.opacity(0.2), lineWidth: 1)
-            )
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.06)))
 
             Spacer()
+
+            // Total Shots Count: e.g. 12/60
+            Text("\(allMatchShots.count)/60")
+                .font(.system(size: 12.5, weight: .black, design: .monospaced))
+                .foregroundColor(Color.black.opacity(0.75))
+
+            // Scorecard Button (以 highPriorityGesture 確保 100% 秒級響應)
+            Button(action: {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    showScorecard = true
+                }
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: "list.clipboard.fill")
+                        .font(.system(size: 11.5))
+                    Text(l10n.scorecardBtn)
+                        .font(.system(size: 10.5, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 7)
+                .background(RoundedRectangle(cornerRadius: 7).fill(Color(red: 0.18, green: 0.35, blue: 0.65)))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .highPriorityGesture(TapGesture().onEnded {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    showScorecard = true
+                }
+            })
+
+            // Finish Button (以 highPriorityGesture 確保 100% 秒級響應)
+            Button(action: {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    showFinishDialog = true
+                }
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: "flag.checkered")
+                        .font(.system(size: 11))
+                    Text(l10n.finishBtn)
+                }
+                .font(.system(size: 10.5, weight: .heavy))
+                .foregroundColor(.white)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 7)
+                .background(RoundedRectangle(cornerRadius: 7).fill(Color(red: 0.85, green: 0.25, blue: 0.15)))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .highPriorityGesture(TapGesture().onEnded {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    showFinishDialog = true
+                }
+            })
         }
     }
 
-    private var capacityPickerRow: some View {
-        HStack(spacing: 6) {
-            Text(l10n.maxShotsLabel)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(Color.black.opacity(0.55))
-            Picker("Capacity", selection: $maxMarksCapacity) {
-                Text(l10n.fiveShots).tag(5)
-                Text(l10n.tenShots).tag(10)
+    // MARK: - S1 S2 & Grand Total (Left) + Real-time Target Magnifier (Right)
+    private var dashboardScoreAndMagnifierRow: some View {
+        HStack(spacing: 8) {
+            leftScoreDashboard
+            rightMagnifierHUD
+        }
+        .frame(height: 98)
+    }
+
+    // MARK: - Left: Grand Total & 3x2 Series Table + Capacity Picker
+    private var leftScoreDashboard: some View {
+        VStack(spacing: 3) {
+            HStack(alignment: .center, spacing: 6) {
+                // 總分 (大賽總分放大顯示)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(language == .traditionalChinese ? "大賽總分" : "TOTAL")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(Color.black.opacity(0.55))
+
+                    Text(String(format: "%.1f", grandTotalScore))
+                        .font(.system(size: 21, weight: .black, design: .monospaced))
+                        .foregroundColor(Color(red: 0.86, green: 0.16, blue: 0.10))
+                        .minimumScaleFactor(0.75)
+                        .lineLimit(1)
+                }
+                .frame(width: 66, alignment: .leading)
+
+                // 分隔線
+                Rectangle()
+                    .fill(Color.black.opacity(0.12))
+                    .frame(width: 1, height: 38)
+
+                // 3 * 2 表格 (S1 ~ S6 各組得分)
+                VStack(spacing: 1.5) {
+                    HStack(spacing: 4) {
+                        seriesCell(index: 0) // S1
+                        seriesCell(index: 1) // S2
+                    }
+                    HStack(spacing: 4) {
+                        seriesCell(index: 2) // S3
+                        seriesCell(index: 3) // S4
+                    }
+                    HStack(spacing: 4) {
+                        seriesCell(index: 4) // S5
+                        seriesCell(index: 5) // S6
+                    }
+                }
+                .frame(maxWidth: .infinity)
             }
-            .pickerStyle(.segmented)
-            .frame(width: 120)
-            .onChange(of: maxMarksCapacity) { _, newCap in
-                if visibleTargetShots.count > newCap {
-                    visibleTargetShots = Array(visibleTargetShots.suffix(newCap))
+
+            Spacer(minLength: 0)
+
+            // 靶面彈印選擇 (Capacity: 5發 / 10發)
+            HStack(spacing: 4) {
+                Text(l10n.maxShotsLabel)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(Color.black.opacity(0.6))
+                    .lineLimit(1)
+
+                Picker("Capacity", selection: $maxMarksCapacity) {
+                    Text(l10n.oneShot).tag(1)
+                    Text(l10n.fiveShots).tag(5)
+                    Text(l10n.tenShots).tag(10)
+                }
+                .pickerStyle(.segmented)
+                .frame(height: 20)
+                .onChange(of: maxMarksCapacity) { _, newCap in
+                    if visibleTargetShots.count > newCap {
+                        visibleTargetShots = Array(visibleTargetShots.suffix(newCap))
+                    }
                 }
             }
-
-            Spacer()
-
-            Text("\(l10n.shotProgress): \(allMatchShots.count)")
-                .font(.system(size: 10.5, weight: .bold, design: .monospaced))
-                .foregroundColor(Color.black.opacity(0.7))
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 11)
+                .fill(Color.white.opacity(0.88))
+                .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 1)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 11)
+                .stroke(Color.black.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    private func seriesCell(index: Int) -> some View {
+        let sNum = index + 1
+        let score = seriesScore(seriesIndex: index)
+        let isCurrent = (currentSeriesNumber == sNum && allMatchShots.count < 60)
+
+        return HStack(spacing: 1.5) {
+            Text("S\(sNum):")
+                .font(.system(size: 8.5, weight: .bold))
+                .foregroundColor(isCurrent ? Color(red: 0.1, green: 0.38, blue: 0.85) : Color.black.opacity(0.55))
+
+            if let val = score {
+                Text(String(format: "%.1f", val))
+                    .font(.system(size: 9, weight: isCurrent ? .heavy : .bold, design: .monospaced))
+                    .foregroundColor(isCurrent ? Color(red: 0.1, green: 0.38, blue: 0.85) : Color.black.opacity(0.85))
+            } else {
+                Text("--.-")
+                    .font(.system(size: 8.5, weight: .regular, design: .monospaced))
+                    .foregroundColor(Color.black.opacity(0.25))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func seriesScore(seriesIndex: Int) -> Double? {
+        let start = seriesIndex * 10
+        guard start < allMatchShots.count else { return nil }
+        let end = min(start + 10, allMatchShots.count)
+        let shots = allMatchShots[start..<end]
+        guard !shots.isEmpty else { return nil }
+        return shots.reduce(0.0) { $0 + $1.score }
+    }
+
+    // MARK: - Right: Real-time Magnifier HUD (Zoomed 5 or 10 marks + Latest shot score & deviation info)
+    private var rightMagnifierHUD: some View {
+        VStack(spacing: 3) {
+            // Header: 🔍 即時放大鏡 / MAGNIFIER
+            HStack(spacing: 3) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 8.5, weight: .bold))
+                    .foregroundColor(Color(red: 0.2, green: 0.45, blue: 0.8))
+                Text(language == .traditionalChinese ? "即時放大鏡" : "MAGNIFIER")
+                    .font(.system(size: 8.5, weight: .heavy))
+                    .foregroundColor(Color.black.opacity(0.6))
+            }
+
+            // Real-time Zoomed Lens View (58x58 circle)
+            // 手槍與步槍放大鏡均看到 8 環以內（手槍 scale 0.78，步槍 scale 2.5）
+            ZStack {
+                // Zoomed Target Board View
+                TargetBoardView(
+                    mode: aimMode,
+                    radius: targetRadius,
+                    shots: visibleTargetShots,
+                    showScoreTag: false
+                )
+                .scaleEffect(aimMode == .rifle ? 3.2 : 0.78)
+                .frame(width: 58, height: 58)
+                .clipShape(Circle())
+                .contentShape(Circle())
+
+                // Fine Crosshair Reticle
+                Path { p in
+                    p.move(to: CGPoint(x: 29, y: 0))
+                    p.addLine(to: CGPoint(x: 29, y: 58))
+                    p.move(to: CGPoint(x: 0, y: 29))
+                    p.addLine(to: CGPoint(x: 58, y: 29))
+                }
+                .stroke(Color.red.opacity(0.35), lineWidth: 0.75)
+
+                // Outer Metallic Bezel
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.90, green: 0.92, blue: 0.95),
+                                Color(red: 0.55, green: 0.60, blue: 0.68),
+                                Color(red: 0.25, green: 0.28, blue: 0.35)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2.2
+                    )
+                    .shadow(color: Color.black.opacity(0.25), radius: 2)
+
+                // Lens Reflection
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.26), Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .center
+                        )
+                    )
+            }
+            .frame(width: 58, height: 58)
+            .contentShape(Circle())
+            .allowsHitTesting(false)
+
+            // Below the lens: Score & Deviation Info of the last shot fired
+            if let last = allMatchShots.last {
+                VStack(spacing: 1) {
+                    HStack(spacing: 3) {
+                        Text(String(format: "%.1f", last.score))
+                            .font(.system(size: 13.5, weight: .black, design: .monospaced))
+                            .foregroundColor(last.score >= 10.9 ? Color(red: 0.95, green: 0.65, blue: 0.0) : Color(red: 0.88, green: 0.15, blue: 0.1))
+
+                        if last.isPerfect {
+                            Text("◎")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(Color.orange)
+                        } else {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 8.5, weight: .black))
+                                .foregroundColor(.blue)
+                                .rotationEffect(last.deviationAngle)
+                        }
+                    }
+
+                    HStack(spacing: 3) {
+                        let devMm = max(0.0, (10.9 - last.score) * 0.25)
+                        Text(last.isPerfect ? (language == .traditionalChinese ? "正中 0.0mm" : "Center 0.0mm") : String(format: "%.2fmm", devMm))
+                            .font(.system(size: 8, weight: .bold, design: .monospaced))
+                            .foregroundColor(Color.black.opacity(0.7))
+
+                        if !last.isPerfect {
+                            Text(last.clockDirection(lang: language))
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(Color(red: 0.1, green: 0.45, blue: 0.2))
+                        }
+                    }
+                }
+            } else {
+                VStack(spacing: 1) {
+                    Text("--.-")
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(Color.black.opacity(0.35))
+                    Text(language == .traditionalChinese ? "待擊發" : "Ready")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundColor(Color.black.opacity(0.4))
+                }
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
+        .frame(width: 108)
+        .background(
+            RoundedRectangle(cornerRadius: 11)
+                .fill(Color.white.opacity(0.88))
+                .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 1)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 11)
+                .stroke(Color.black.opacity(0.1), lineWidth: 1)
+        )
     }
 
     @ViewBuilder
@@ -1171,13 +1401,14 @@ struct GameView: View {
         let tremorX = sin(t * 3.7 + 0.4) * 1.08 + sin(t * 7.1) * 0.36
         let tremorY = cos(t * 3.2 + 1.1) * 1.08 + cos(t * 6.1) * 0.36
 
-        var x = (driftX + tremorX) * (mode == .pistol ? 1.17 : 0.72)
-        var y = (driftY + tremorY) * (mode == .pistol ? 1.17 : 0.72)
+        var x = (driftX + tremorX) * (mode == .pistol ? 1.88 : 0.72)
+        var y = (driftY + tremorY) * (mode == .pistol ? 1.88 : 0.72)
 
         if isHoldingBreath {
             // 原本壓至 0.25（晃動過小几乎都在 10.5 以上）
             // 現調整為手槍約在 7 環範圍（最大振幅約 33~36pt，乘數 0.78），步槍在 8 環範圍（最大振幅約 13~14pt，乘數 0.65）
-            let factor = (mode == .pistol) ? 0.78 : 0.65
+            // 手槍屏息時振幅適度收斂至 9 環以內（factor = 0.86），步槍則保持 8 環以內精密微動（factor = 0.65）
+            let factor = (mode == .pistol) ? 0.86 : 0.65
             x *= factor
             y *= factor
         }
@@ -1254,19 +1485,68 @@ struct GameView: View {
         }
         let dist = sqrt(impactX * impactX + impactY * impactY)
 
-        let effectiveRadius = (aimMode == .rifle) ? (targetRadius * 0.30) : targetRadius
-        let ringStep = effectiveRadius / 10.0
-        let scoreStep = ringStep / 10.0
-
         let computedScore: Double
-        if dist <= scoreStep {
-            computedScore = 10.9
-        } else if dist >= effectiveRadius {
-            computedScore = 0.0
+        if aimMode == .pistol {
+            // ISSF 10m 手槍靶官方標準（17x17cm，10環直徑11.5mm，內10環直徑5.0mm，1環外徑155.5mm）
+            // 比例換算：1環半徑 77.75mm 對應 targetRadius = 110.0pt (1.4148 pt/mm)
+            // 子彈直徑 4.5mm (半徑 2.25mm = 3.183pt)
+            // 內10環半徑 2.50mm = 3.537pt；10環半徑 5.75mm = 8.135pt
+            // 10.9 判定：子彈完全在 5.0mm 內環裡面 (dist <= 0.25mm = 0.354pt)
+            let ptPerMm: CGFloat = targetRadius / 77.75
+            let bulletRadius: CGFloat = 2.25 * ptPerMm
+            let inner10Radius: CGFloat = 2.50 * ptPerMm
+            let ring10Radius: CGFloat = 5.75 * ptPerMm
+            let dist10_9: CGFloat = max(0.1, inner10Radius - bulletRadius) // ~0.354pt
+
+            if dist <= dist10_9 {
+                computedScore = 10.9
+            } else if dist >= targetRadius + bulletRadius {
+                computedScore = 0.0
+            } else if dist <= ring10Radius {
+                // 10.0 ~ 10.8 區間
+                let ratio = (dist - dist10_9) / (ring10Radius - dist10_9)
+                let raw = 10.8 - ratio * 0.8
+                computedScore = max(10.0, min(10.8, (raw * 10.0).rounded() / 10.0))
+            } else {
+                // 9.9 ~ 1.0 區間（各環半徑步長 8.0mm * ptPerMm = 11.318pt）
+                let ringStep = 8.0 * ptPerMm
+                let stepsAway = (dist - ring10Radius) / ringStep
+                let raw = 9.9 - Double(stepsAway) * 1.0
+                computedScore = max(0.0, min(9.9, (raw * 10.0).rounded() / 10.0))
+            }
         } else {
-            let stepsAway = floor(dist / scoreStep)
-            let raw = 10.9 - Double(stepsAway) * 0.1
-            computedScore = max(0.0, (raw * 10.0).rounded() / 10.0)
+            // ISSF 10m 步槍靶官方標準（1環總直徑45.5mm，4環直徑30.5mm，9環直徑5.5mm，10環中心白點0.5mm）
+            // 比例換算：1環半徑 22.75mm 對應 effectiveRadius = 33.0pt (1.4505 pt/mm)
+            // 子彈直徑 4.5mm (半徑 2.25mm = 3.264pt)
+            // 9環半徑 2.75mm = 3.989pt；10環中心點半徑 0.25mm = 0.363pt
+            // 核心規則：
+            // 1. 子彈完全在9分環內且不觸碰9分環線為 10.9 分 (dist <= 0.50mm = 0.725pt)
+            // 2. 子彈邊緣碰到中心點就算是 10.0 分（子彈中心壓在9分環上，dist <= 2.50mm = 3.626pt）
+            let effectiveRadius = targetRadius * 0.30
+            let ptPerMm: CGFloat = effectiveRadius / 22.75
+            let bulletRadius: CGFloat = 2.25 * ptPerMm
+            let centerDotRadius: CGFloat = 0.25 * ptPerMm
+            let ring9Radius: CGFloat = 2.75 * ptPerMm
+
+            let dist10_9: CGFloat = max(0.1, ring9Radius - bulletRadius) // ~0.725pt (0.50mm)
+            let dist10_0: CGFloat = centerDotRadius + bulletRadius // ~3.626pt (2.50mm，邊緣觸碰中心白點，中心壓在9分環上)
+
+            if dist <= dist10_9 {
+                computedScore = 10.9
+            } else if dist >= effectiveRadius + bulletRadius {
+                computedScore = 0.0
+            } else if dist <= dist10_0 {
+                // 10.0 ~ 10.8 分（子彈邊緣碰到中心點以內）
+                let ratio = (dist - dist10_9) / (dist10_0 - dist10_9)
+                let raw = 10.9 - ratio * 0.9
+                computedScore = max(10.0, min(10.8, (raw * 10.0).rounded() / 10.0))
+            } else {
+                // 9.9 ~ 1.0 分（環距步長 2.5mm * ptPerMm = 3.626pt）
+                let ringStep = 2.5 * ptPerMm
+                let stepsAway = (dist - dist10_0) / ringStep
+                let raw = 9.9 - Double(stepsAway) * 1.0
+                computedScore = max(0.0, min(9.9, (raw * 10.0).rounded() / 10.0))
+            }
         }
 
         let newShot = ShotRecord(
@@ -1278,8 +1558,9 @@ struct GameView: View {
 
         allMatchShots.append(newShot)
 
+        // 靶印選擇5時，射完第六發把前面5發清空；選擇10時，射完第11發把前面10發清空
         if visibleTargetShots.count >= maxMarksCapacity {
-            visibleTargetShots.removeFirst()
+            visibleTargetShots.removeAll()
         }
         visibleTargetShots.append(newShot)
 
@@ -1291,7 +1572,88 @@ struct GameView: View {
         }
     }
 
-    private func finishAndSaveMatch() {
+    // 自訂結束比賽確認對話框
+    private var finishConfirmationOverlay: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "flag.checkered.circle.fill")
+                .font(.system(size: 38))
+                .foregroundColor(Color(red: 0.90, green: 0.25, blue: 0.20))
+
+            Text(allMatchShots.isEmpty ? (language == .traditionalChinese ? "結束遊戲" : "Quit Game") : l10n.finishTitle)
+                .font(.system(size: 19, weight: .black))
+                .foregroundColor(.black)
+
+            Text(allMatchShots.isEmpty ?
+                 (language == .traditionalChinese ? "尚未進行任何擊發，確定要返回主選單嗎？" : "No shots fired yet. Return to main menu?") :
+                 (language == .traditionalChinese ? "本場比賽共擊發 \(allMatchShots.count) 發，總分 \(String(format: "%.1f", grandTotalScore)) 分。請選擇處理方式：" : "Total \(allMatchShots.count) shots fired, Total Score \(String(format: "%.1f", grandTotalScore)). Please select an option:"))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Color.black.opacity(0.68))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 8)
+
+            VStack(spacing: 9) {
+                if !allMatchShots.isEmpty {
+                    Button(action: {
+                        showFinishDialog = false
+                        finishAndSaveMatch()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "square.and.arrow.down.fill")
+                            Text(l10n.saveAndExit)
+                        }
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(red: 0.18, green: 0.65, blue: 0.35)))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button(action: {
+                    showFinishDialog = false
+                    onExit()
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.uturn.left.circle.fill")
+                        Text(allMatchShots.isEmpty ? (language == .traditionalChinese ? "返回主選單" : "Return to Menu") : l10n.exitWithoutSaving)
+                    }
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(red: 0.85, green: 0.25, blue: 0.20)))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        showFinishDialog = false
+                    }
+                }) {
+                    Text(l10n.cancel)
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundColor(Color.black.opacity(0.65))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.06)))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(22)
+        .frame(width: 300)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.28), radius: 18, x: 0, y: 6)
+        )
+    }
+
+        private func finishAndSaveMatch() {
         HistoryManager.shared.saveMatch(mode: aimMode, shots: allMatchShots)
         onExit()
     }
@@ -1440,7 +1802,29 @@ struct OlympicScorecardView: View {
     }
 
     var body: some View {
-        NavigationView {
+        VStack(spacing: 0) {
+            // Header Bar
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "list.clipboard.fill")
+                        .foregroundColor(Color(red: 0.18, green: 0.35, blue: 0.65))
+                    Text(language == .traditionalChinese ? "奧運射擊記分表" : "Olympic Scorecard")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundColor(.black)
+                }
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(Color.black.opacity(0.45))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.white)
+
+            Divider()
+
             ZStack {
                 Color(red: 0.94, green: 0.91, blue: 0.85).ignoresSafeArea()
 
@@ -1448,8 +1832,7 @@ struct OlympicScorecardView: View {
                     VStack(spacing: 14) {
                         // Grand Total Header Banner
                         HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(language == .traditionalChinese ? "全場累積總分" : "Grand Total")
+                            VStack(alignment: .leading, spacing: 2) {                                Text(language == .traditionalChinese ? "全場累積總分" : "Grand Total")
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundColor(Color.black.opacity(0.6))
                                 Text(String(format: "%.1f", grandTotal))
@@ -1502,14 +1885,6 @@ struct OlympicScorecardView: View {
                     .padding(16)
                 }
             }
-            .navigationTitle(language == .traditionalChinese ? "記分表" : "Scorecard")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(language == .traditionalChinese ? "關閉" : "Close", action: onClose)
-                        .font(.system(size: 15, weight: .bold))
-                }
-            }
         }
     }
 }
@@ -1553,26 +1928,60 @@ private struct ScorecardShotCell: View {
     }
 }
 
-// MARK: - Target Board View
+// MARK: - Target Board View (精確採用 ISSF / Wikipedia 官方尺寸規格渲染)
 struct TargetBoardView: View {
     let mode: AimMode
     let radius: CGFloat // Base radius = 110pt
     let shots: [ShotRecord]
+    var showScoreTag: Bool = true
 
-    var effectiveTargetRadius: CGFloat {
-        (mode == .rifle) ? (radius * 0.30) : radius
-    }
-
-    var blackThreshold: Int {
-        (mode == .pistol) ? 7 : 4
+    // 各環精確半徑 (pt)
+    func ringRadius(for ring: Int) -> CGFloat {
+        switch mode {
+        case .pistol:
+            // 手槍靶：1環外徑 155.5mm (半徑 77.75mm) 對應 targetRadius = 110.0pt
+            let ptPerMm: CGFloat = radius / 77.75
+            switch ring {
+            case 10: return 5.75 * ptPerMm  // 10環直徑 11.5mm (半徑 5.75mm)
+            case 9:  return 13.75 * ptPerMm // 9環直徑 27.5mm (半徑 13.75mm)
+            case 8:  return 21.75 * ptPerMm // 8環直徑 43.5mm (半徑 21.75mm)
+            case 7:  return 29.75 * ptPerMm // 7環直徑 59.5mm (半徑 29.75mm，黑色瞄準區邊界)
+            case 6:  return 37.75 * ptPerMm // 6環直徑 75.5mm
+            case 5:  return 45.75 * ptPerMm // 5環直徑 91.5mm
+            case 4:  return 53.75 * ptPerMm // 4環直徑 107.5mm
+            case 3:  return 61.75 * ptPerMm // 3環直徑 123.5mm
+            case 2:  return 69.75 * ptPerMm // 2環直徑 139.5mm
+            case 1:  return 77.75 * ptPerMm // 1環直徑 155.5mm (總計分外徑)
+            default: return 0
+            }
+        case .rifle:
+            // 步槍靶：1環總外徑 45.5mm (半徑 22.75mm) 對應 effectiveRadius = 33.0pt
+            let effectiveRadius = radius * 0.30
+            let ptPerMm: CGFloat = effectiveRadius / 22.75
+            switch ring {
+            case 10: return 0.25 * ptPerMm  // 10環直徑 0.5mm 中心白點 (半徑 0.25mm)
+            case 9:  return 2.75 * ptPerMm  // 9環直徑 5.5mm (半徑 2.75mm)
+            case 8:  return 5.25 * ptPerMm  // 8環直徑 10.5mm (半徑 5.25mm)
+            case 7:  return 7.75 * ptPerMm  // 7環直徑 15.5mm (半徑 7.75mm)
+            case 6:  return 10.25 * ptPerMm // 6環直徑 20.5mm (半徑 10.25mm)
+            case 5:  return 12.75 * ptPerMm // 5環直徑 25.5mm (半徑 12.75mm)
+            case 4:  return 15.25 * ptPerMm // 4環直徑 30.5mm (半徑 15.25mm，黑色瞄準區邊界)
+            case 3:  return 17.75 * ptPerMm // 3環直徑 35.5mm (半徑 17.75mm)
+            case 2:  return 20.25 * ptPerMm // 2環直徑 40.5mm (半徑 20.25mm)
+            case 1:  return 22.75 * ptPerMm // 1環直徑 45.5mm (半徑 22.75mm，總外徑)
+            default: return 0
+            }
+        }
     }
 
     var bullseyeRadius: CGFloat {
-        effectiveTargetRadius * CGFloat(11 - blackThreshold) / 10.0
+        // 黑色瞄準區：手槍為 7 環邊界(59.5mm)，步槍為 4 環邊界(30.5mm)
+        (mode == .pistol) ? ringRadius(for: 7) : ringRadius(for: 4)
     }
 
     var body: some View {
         ZStack {
+            // 經典米色射擊靶紙背景
             RoundedRectangle(cornerRadius: 4)
                 .fill(
                     LinearGradient(
@@ -1585,50 +1994,71 @@ struct TargetBoardView: View {
                 .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
                 .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.black.opacity(0.15), lineWidth: 1))
 
-            // Solid Black Bullseye (7以內 for 手槍, 4以內 for 步槍)
+            // 黑色同心圓瞄準區（手槍7~10環，步槍4~9環）
             Circle()
                 .fill(Color(red: 0.1, green: 0.1, blue: 0.1))
                 .frame(width: bullseyeRadius * 2, height: bullseyeRadius * 2)
 
-            // Concentric Ring Lines
+            // 同心計分環線（1~10環）
             ForEach(1...10, id: \.self) { ring in
-                let ringR = effectiveTargetRadius * CGFloat(11 - ring) / 10.0
-                let isInsideBlack = ring >= blackThreshold
+                let r = ringRadius(for: ring)
+                let isInsideBlack = (mode == .pistol) ? (ring >= 7) : (ring >= 4)
 
-                Circle()
-                    .stroke(
-                        isInsideBlack ? Color.white.opacity(0.9) : Color.black.opacity(0.8),
-                        lineWidth: ring == 1 ? 1.2 : (isInsideBlack ? 0.9 : 0.75)
-                    )
-                    .frame(width: ringR * 2, height: ringR * 2)
+                if ring < 10 || mode == .pistol {
+                    Circle()
+                        .stroke(
+                            isInsideBlack ? Color.white.opacity(0.9) : Color.black.opacity(0.8),
+                            lineWidth: ring == 1 ? 1.1 : (isInsideBlack ? 0.85 : 0.7)
+                        )
+                        .frame(width: r * 2, height: r * 2)
+                }
             }
 
-            // Center White Dot (10.9)
-            Circle()
-                .fill(Color.white)
-                .frame(width: (mode == .rifle) ? 2.5 : 3.5, height: (mode == .rifle) ? 2.5 : 3.5)
+            // 手槍內10環（直徑 5.0mm 內10環，十分由雙環組成）
+            if mode == .pistol {
+                let ptPerMm: CGFloat = radius / 77.75
+                let inner10R = 2.50 * ptPerMm
+                Circle()
+                    .stroke(Color.white.opacity(0.92), lineWidth: 0.85)
+                    .frame(width: inner10R * 2, height: inner10R * 2)
+            }
 
-            // Ring Numbers 1 through 8 along the 4 axes
+            // 步槍中心 10 分白點（官方直徑 0.5mm，清晰中心白點）
+            if mode == .rifle {
+                let effectiveRadius = radius * 0.30
+                let ptPerMm: CGFloat = effectiveRadius / 22.75
+                let dotD = max(1.8, 0.5 * ptPerMm)
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: dotD, height: dotD)
+            } else {
+                Circle()
+                    .fill(Color.white.opacity(0.7))
+                    .frame(width: 1.2, height: 1.2)
+            }
+
+            // 1~8 環環數標註（四軸排列）
             ringNumbersView
 
-            // Target Corner Label
+            // 靶紙角落規格標註
             VStack {
                 Spacer()
                 HStack {
                     Spacer()
-                    Text(mode == .pistol ? "krüger 1313 N" : "10M Air Rifle Target")
-                        .font(.system(size: 7.5, weight: .semibold, design: .monospaced))
-                        .foregroundColor(Color.black.opacity(0.4))
+                    Text(mode == .pistol ? "ISSF 10m Air Pistol (17x17cm)" : "ISSF 10m Air Rifle (Ø45.5mm)")
+                        .font(.system(size: 7.2, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Color.black.opacity(0.42))
                         .padding(4)
                 }
             }
             .frame(width: radius * 2 + 14, height: radius * 2 + 14)
 
-            // Grey Bullet Imprints (灰色的子彈印)
+            // 灰色子彈印
             ForEach(shots) { shot in
                 BulletHoleView(
                     shot: shot,
-                    isLatest: shot.id == shots.last?.id
+                    isLatest: shot.id == shots.last?.id,
+                    showScoreTag: showScoreTag
                 )
                 .offset(x: shot.offset.x, y: shot.offset.y)
             }
@@ -1639,10 +2069,12 @@ struct TargetBoardView: View {
     @ViewBuilder
     private var ringNumbersView: some View {
         ForEach(1...8, id: \.self) { num in
-            let dist = effectiveTargetRadius * CGFloat(10.5 - Double(num)) / 10.0
-            let isWhite = num >= blackThreshold
+            let r1 = ringRadius(for: num)
+            let r2 = ringRadius(for: num + 1)
+            let dist = (r1 + r2) / 2.0
+            let isWhite = (mode == .pistol) ? (num >= 7) : (num >= 4)
             let numColor = isWhite ? Color.white : Color.black
-            let fontSize: CGFloat = (mode == .rifle) ? 5.2 : 7.5
+            let fontSize: CGFloat = (mode == .rifle) ? 4.8 : 7.2
 
             Text("\(num)").font(.system(size: fontSize, weight: .bold)).foregroundColor(numColor).offset(y: -dist)
             Text("\(num)").font(.system(size: fontSize, weight: .bold)).foregroundColor(numColor).offset(y: dist)
@@ -1652,26 +2084,45 @@ struct TargetBoardView: View {
     }
 }
 
-// MARK: - Grey Bullet Hole View (灰色的子彈印)
+// MARK: - Grey Bullet Hole View (灰色的子彈印，依手槍與步槍精確比例計算子彈直徑)
 struct BulletHoleView: View {
     let shot: ShotRecord
     let isLatest: Bool
+    var showScoreTag: Bool = true
+
+    var bulletDiameter: CGFloat {
+        // 嚴格依 4.5mm 競賽彈丸與靶紙尺寸精確換算：
+        // 手槍靶：155.5mm 對應 110pt -> 4.5mm = 6.37pt
+        // 步槍靶：45.5mm 對應 33pt -> 4.5mm = 6.53pt
+        switch shot.mode {
+        case .pistol:
+            return 6.37
+        case .rifle:
+            return 6.53
+        }
+    }
 
     var body: some View {
+        let d = bulletDiameter
         ZStack {
-            Circle().fill(Color(white: 0.52)).frame(width: 7.5, height: 7.5)
-            Circle().fill(Color(white: 0.28)).frame(width: 5.0, height: 5.0)
-            Circle().stroke(Color(white: 0.7), lineWidth: 0.6).frame(width: 7.0, height: 7.0)
+            Circle().fill(Color(white: 0.52)).frame(width: d, height: d)
+            Circle().fill(Color(white: 0.28)).frame(width: d * 0.65, height: d * 0.65)
+            Circle().stroke(Color(white: 0.7), lineWidth: 0.6).frame(width: d * 0.92, height: d * 0.92)
 
             if isLatest {
-                Circle().stroke(shot.isPerfect ? Color.yellow : Color.red, lineWidth: 1.5).frame(width: 13, height: 13)
-                Text(String(format: "%.1f", shot.score))
-                    .font(.system(size: 8.5, weight: .heavy))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 3)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(shot.isPerfect ? Color.orange : Color.black.opacity(0.85)))
-                    .offset(x: 12, y: -7)
+                Circle()
+                    .stroke(shot.isPerfect ? Color.yellow : Color.red, lineWidth: 1.5)
+                    .frame(width: d + 5.0, height: d + 5.0)
+
+                if showScoreTag {
+                    Text(String(format: "%.1f", shot.score))
+                        .font(.system(size: 8.5, weight: .heavy))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(shot.isPerfect ? Color.orange : Color.black.opacity(0.85)))
+                        .offset(x: d * 0.7 + 5, y: -7)
+                }
             }
         }
     }
@@ -1847,11 +2298,11 @@ enum TutorialStep: Int, CaseIterable, Identifiable {
             return lang == .traditionalChinese ?
                 """
                 • 鬆手擊發：抓準同心圓重疊至中心的一瞬間，鬆開手指開槍！
-                • 示範擊中正中心 0.0mm 偏差，榮獲最高滿分 10.9 分！並伴隨真實金屬撞擊槍聲！
+                • 擊發伴隨清脆金屬撞擊聲，可由右上方即時放大鏡檢視彈印！
                 """ :
                 """
-                • Release to Fire: Release your finger at peak alignment!
-                • Scores a dead-center 10.9 bullseye accompanied by real metallic impact gunshot audio!
+                • Release to Fire: Release your finger at peak concentric alignment!
+                • Real metallic hit audio plays, check real-time magnifier for bullet imprints!
                 """
         case .viewScorecard:
             return lang == .traditionalChinese ?
@@ -2242,52 +2693,148 @@ struct InstructionsSheetView: View {
         }
     }
 
-    // MARK: - 固定靶場基底場景 (底色與靶子同色，中央靶面固定不動)
+    // MARK: - 固定靶場基底場景 (同步遊戲最新介面：左側總分與3x2表格、右側即時放大鏡)
     private var mockBaseRangeScene: some View {
-        VStack(spacing: 0) {
-            // 頂部儀表板
-            HStack {
-                HStack(spacing: 4) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 9.5))
-                        .foregroundColor(Color(red: 0.75, green: 0.45, blue: 0.05))
-                    Text(language == .traditionalChinese ? "10米步槍" : "10m Rifle")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.black)
+        VStack(spacing: 5) {
+            // 頂部儀表板 (返回選單、鎖定項目、發數、成績單、結束)
+            HStack(spacing: 4) {
+                HStack(spacing: 2) {
+                    Image(systemName: "chevron.left")
+                    Text(language == .traditionalChinese ? "選單" : "Menu")
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(Color.yellow.opacity(0.3)))
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(Color.black.opacity(0.75))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.black.opacity(0.08)))
+
+                HStack(spacing: 3) {
+                    Circle().stroke(Color.black, lineWidth: 1.2).frame(width: 8, height: 8)
+                    Text(language == .traditionalChinese ? "10米步槍" : "10m Rifle")
+                        .font(.system(size: 8, weight: .black))
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 6))
+                        .foregroundColor(Color.black.opacity(0.45))
+                }
+                .padding(.horizontal, 5)
+                .padding(.vertical, 3)
+                .background(RoundedRectangle(cornerRadius: 4).fill(Color.black.opacity(0.06)))
 
                 Spacer()
 
-                Text(currentStep == .releaseFire10_9 || currentStep == .viewScorecard || currentStep == .finishAndSave ?
-                     (language == .traditionalChinese ? "發數: 1/60" : "Shots: 1/60") :
-                     (language == .traditionalChinese ? "發數: 0/60" : "Shots: 0/60"))
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color.black.opacity(0.7))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3.5)
-                    .background(Capsule().fill(Color.black.opacity(0.08)))
+                Text(currentStep == .releaseFire10_9 || currentStep == .viewScorecard || currentStep == .finishAndSave ? "1/60" : "0/60")
+                    .font(.system(size: 9, weight: .black, design: .monospaced))
+                    .foregroundColor(Color.black.opacity(0.75))
+
+                HStack(spacing: 2) {
+                    Image(systemName: "list.clipboard.fill").font(.system(size: 7.5))
+                    Text(language == .traditionalChinese ? "成績單" : "Scores").font(.system(size: 7.5, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 3)
+                .background(RoundedRectangle(cornerRadius: 4).fill(Color(red: 0.18, green: 0.35, blue: 0.65)))
+
+                HStack(spacing: 2) {
+                    Image(systemName: "flag.checkered").font(.system(size: 7.5))
+                    Text(language == .traditionalChinese ? "結束" : "Finish").font(.system(size: 7.5, weight: .heavy))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 3)
+                .background(RoundedRectangle(cornerRadius: 4).fill(Color(red: 0.85, green: 0.25, blue: 0.15)))
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
+            .padding(.horizontal, 8)
+            .padding(.top, 6)
+
+            // 即時放大鏡與總分列 (同步實際遊戲之縮小視圖)
+            HStack(spacing: 5) {
+                // 左側總分與3x2表格
+                let isFired = (currentStep == .releaseFire10_9 || currentStep == .viewScorecard || currentStep == .finishAndSave)
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(alignment: .center, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(language == .traditionalChinese ? "總分" : "TOTAL")
+                                .font(.system(size: 6.5, weight: .bold))
+                                .foregroundColor(Color.black.opacity(0.55))
+                            Text(isFired ? "10.9" : "0.0")
+                                .font(.system(size: 13, weight: .black, design: .monospaced))
+                                .foregroundColor(Color(red: 0.86, green: 0.16, blue: 0.10))
+                        }
+                        .frame(width: 44, alignment: .leading)
+
+                        Rectangle().fill(Color.black.opacity(0.12)).frame(width: 1, height: 22)
+
+                        // 3x2 表格
+                        VStack(spacing: 1) {
+                            HStack(spacing: 3) {
+                                Text(isFired ? "S1: 10.9" : "S1: --.-").font(.system(size: 6.5, weight: .bold, design: .monospaced)).foregroundColor(isFired ? Color.blue : Color.black.opacity(0.5))
+                                Text("S2: --.-").font(.system(size: 6.5, weight: .regular, design: .monospaced)).foregroundColor(Color.black.opacity(0.3))
+                            }
+                            HStack(spacing: 3) {
+                                Text("S3: --.-").font(.system(size: 6.5, weight: .regular, design: .monospaced)).foregroundColor(Color.black.opacity(0.3))
+                                Text("S4: --.-").font(.system(size: 6.5, weight: .regular, design: .monospaced)).foregroundColor(Color.black.opacity(0.3))
+                            }
+                            HStack(spacing: 3) {
+                                Text("S5: --.-").font(.system(size: 6.5, weight: .regular, design: .monospaced)).foregroundColor(Color.black.opacity(0.3))
+                                Text("S6: --.-").font(.system(size: 6.5, weight: .regular, design: .monospaced)).foregroundColor(Color.black.opacity(0.3))
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.88)))
+
+                // 右側即時放大鏡
+                VStack(spacing: 1) {
+                    HStack(spacing: 2) {
+                        Image(systemName: "magnifyingglass").font(.system(size: 6))
+                        Text(language == .traditionalChinese ? "即時放大" : "ZOOM").font(.system(size: 6, weight: .heavy))
+                    }
+                    .foregroundColor(Color.black.opacity(0.6))
+
+                    ZStack {
+                        TargetBoardView(
+                            mode: .rifle,
+                            radius: 20,
+                            shots: isFired ? [ShotRecord(offset: .zero, score: 10.9, mode: .rifle, shotNumber: 1)] : [],
+                            showScoreTag: false
+                        )
+                        .scaleEffect(2.5)
+                        .frame(width: 26, height: 26)
+                        .clipShape(Circle())
+                        Circle().stroke(Color.gray, lineWidth: 1.0)
+                    }
+                    .frame(width: 26, height: 26)
+
+                    Text(isFired ? "10.9 ◎" : "--.-")
+                        .font(.system(size: 7.5, weight: .black, design: .monospaced))
+                        .foregroundColor(Color(red: 0.95, green: 0.65, blue: 0.0))
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .frame(width: 60)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.88)))
+            }
+            .padding(.horizontal, 8)
 
             Spacer()
 
-            // 步槍靶面 (半徑 70pt，位置完全固定在正中)
+            // 步槍靶面 (半徑 55pt，位置完全固定在正中)
+            let isFired = (currentStep == .releaseFire10_9 || currentStep == .viewScorecard || currentStep == .finishAndSave)
             ZStack {
                 TargetBoardView(
                     mode: .rifle,
-                    radius: 70,
-                    shots: (currentStep == .releaseFire10_9 || currentStep == .viewScorecard || currentStep == .finishAndSave) ?
-                        [ShotRecord(offset: .zero, score: 10.9, mode: .rifle, shotNumber: 1)] : []
+                    radius: 55,
+                    shots: isFired ? [ShotRecord(offset: .zero, score: 10.9, mode: .rifle, shotNumber: 1)] : []
                 )
 
                 // 步槍瞄準同心圓
                 RifleConcentricSightView()
                     .offset(currentStep == .holdToAim ? sightOffset : .zero)
-                    .scaleEffect(70.0 / 110.0)
+                    .scaleEffect(55.0 / 110.0)
             }
 
             Spacer()
@@ -2424,7 +2971,7 @@ struct InstructionsSheetView: View {
                     Text(language == .traditionalChinese ? "歷史射擊成績單" : "Match Scorecard")
                         .font(.system(size: 12, weight: .bold))
                     Spacer()
-                    Text("10.9 / 600")
+                    Text("")
                         .font(.system(size: 13, weight: .black, design: .monospaced))
                         .foregroundColor(Color(red: 0.85, green: 0.15, blue: 0.1))
                 }
