@@ -3028,62 +3028,79 @@ struct InstructionsSheetView: View {
         }
     }
 
-    // MARK: - 步驟 6 覆蓋層：結束確認視窗 (窗口位置固定，只有圓點動)
+    // MARK: - 步驟 6 覆蓋層：結束確認視窗 (完全同步實際遊戲 finishConfirmationOverlay 樣式與佈局)
     private var mockExitConfirmOverlay: some View {
         ZStack {
             Color.black.opacity(0.55).ignoresSafeArea()
 
-            VStack(spacing: 10) {
+            VStack(spacing: 11) {
+                // 1. 頂部紅色旗幟圓形圖標 (與實際遊戲一致)
+                Image(systemName: "flag.checkered.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(Color(red: 0.90, green: 0.25, blue: 0.20))
+
+                // 2. 標題 (黑色粗體)
                 Text(language == .traditionalChinese ? "結束本場射擊" : "Finish Match")
-                    .font(.system(size: 13.5, weight: .bold))
-                    .foregroundColor(Color(red: 0.95, green: 0.82, blue: 0.45))
+                    .font(.system(size: 14.5, weight: .black))
+                    .foregroundColor(.black)
 
-                // 儲存成績並結束 (窗口固定，只有圓點動)
-                ZStack {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill")
-                        Text(language == .traditionalChinese ? "儲存成績並結束" : "Save & Finish")
+                // 3. 說明文字 (居中灰色文字)
+                Text(language == .traditionalChinese ? "本場比賽共擊發 1 發，總分 10.9 分。請選擇處理方式：" : "Total 1 shot fired, Total Score 10.9. Please select an option:")
+                    .font(.system(size: 9.5, weight: .medium))
+                    .foregroundColor(Color.black.opacity(0.68))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 4)
+
+                // 4. 三個操作按鈕 (完全同步實際遊戲：綠色儲存並結束、紅色退出不儲存、灰色取消)
+                VStack(spacing: 7) {
+                    // (1) 儲存成績並結束 (綠色按鈕，動態點擊圓點懸浮於右側)
+                    ZStack {
+                        HStack(spacing: 5) {
+                            Image(systemName: "square.and.arrow.down.fill")
+                                .font(.system(size: 11))
+                            Text(language == .traditionalChinese ? "儲存成績並結束" : "Save & Finish")
+                                .font(.system(size: 11.5, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color(red: 0.18, green: 0.65, blue: 0.35)))
+
+                        // 只有圓點動
+                        HStack {
+                            Spacer()
+                            TutorialTouchDotView(isLongPress: false)
+                                .padding(.trailing, 10)
+                        }
                     }
-                    .font(.system(size: 11.5, weight: .bold))
+
+                    // (2) 退出不儲存 (紅色按鈕，與實際遊戲完全一致)
+                    HStack(spacing: 5) {
+                        Image(systemName: "arrow.uturn.left.circle.fill")
+                            .font(.system(size: 11))
+                        Text(language == .traditionalChinese ? "退出不儲存" : "Exit Without Saving")
+                            .font(.system(size: 11.5, weight: .bold))
+                    }
                     .foregroundColor(.white)
-                    .frame(width: 185, height: 34)
-                    .background(
-                        LinearGradient(colors: [Color(red: 0.15, green: 0.55, blue: 0.35), Color(red: 0.08, green: 0.35, blue: 0.2)], startPoint: .top, endPoint: .bottom)
-                    )
-                    .cornerRadius(10)
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.yellow, lineWidth: 1.8))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color(red: 0.85, green: 0.25, blue: 0.20)))
 
-                    // 只有圓點動
-                    HStack {
-                        Spacer()
-                        TutorialTouchDotView(isLongPress: false)
-                            .padding(.trailing, 12)
-                    }
+                    // (3) 取消按鈕 (淺灰底黑字，與實際遊戲完全一致)
+                    Text(language == .traditionalChinese ? "取消" : "Cancel")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color.black.opacity(0.65))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.06)))
                 }
-
-                // 退出不儲存
-                Text(language == .traditionalChinese ? "退出不儲存" : "Exit Without Saving")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.7))
-                    .frame(width: 185, height: 30)
-                    .background(Color.white.opacity(0.12))
-                    .cornerRadius(8)
-
-                // 成功儲存標示
-                HStack(spacing: 4) {
-                    Image(systemName: "archivebox.fill")
-                    Text(language == .traditionalChinese ? "成績已歸檔至歷史記錄！" : "Saved to Match History!")
-                }
-                .font(.system(size: 9.5, weight: .bold))
-                .foregroundColor(Color(red: 0.4, green: 0.9, blue: 0.5))
-                .padding(.top, 4)
             }
-            .padding(14)
-            .frame(width: 225)
+            .padding(16)
+            .frame(width: 245)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(red: 0.12, green: 0.16, blue: 0.24))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(red: 0.85, green: 0.7, blue: 0.35), lineWidth: 1.5))
+                RoundedRectangle(cornerRadius: 15)
+                    .fill(Color.white)
+                    .shadow(color: Color.black.opacity(0.28), radius: 14, x: 0, y: 5)
             )
         }
     }
