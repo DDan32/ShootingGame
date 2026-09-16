@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 #if canImport(AudioToolbox)
 import AudioToolbox
 #endif
@@ -62,12 +63,52 @@ struct L10n {
 // MARK: - Sound & Haptic FX Engine
 final class SoundManager {
     static let shared = SoundManager()
-    private init() {}
+    private var audioPlayer: AVAudioPlayer?
+
+    private init() {
+        configureAudioSession()
+        prepareAudioPlayer()
+    }
+
+    private func configureAudioSession() {
+        #if os(iOS)
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("Failed to configure audio session: \(error)")
+        }
+        #endif
+    }
+
+    private func prepareAudioPlayer() {
+        if let url = Bundle.main.url(forResource: "metal_hit", withExtension: "wav") ??
+                     Bundle.main.url(forResource: "metal_hit", withExtension: "m4a") {
+            do {
+                audioPlayer = try AVAudioPlayer(contentsOf: url)
+                audioPlayer?.prepareToPlay()
+            } catch {
+                print("Failed to load metal hit sound: \(error)")
+            }
+        }
+    }
 
     func playGunshot() {
-        #if canImport(AudioToolbox)
-        AudioServicesPlaySystemSound(1104)
-        #endif
+        if let player = audioPlayer {
+            player.stop()
+            player.currentTime = 0
+            player.play()
+        } else {
+            prepareAudioPlayer()
+            if let player = audioPlayer {
+                player.play()
+            } else {
+                #if canImport(AudioToolbox)
+                AudioServicesPlaySystemSound(1104)
+                #endif
+            }
+        }
+
         #if canImport(UIKit)
         let gen = UIImpactFeedbackGenerator(style: .heavy)
         gen.prepare()
@@ -1185,7 +1226,7 @@ struct GameView: View {
         }
         let dist = sqrt(impactX * impactX + impactY * impactY)
 
-        let effectiveRadius = (aimMode == .rifle) ? (targetRadius * 0.42) : targetRadius
+        let effectiveRadius = (aimMode == .rifle) ? (targetRadius * 0.35) : targetRadius
         let ringStep = effectiveRadius / 10.0
         let scoreStep = ringStep / 10.0
 
@@ -1481,7 +1522,7 @@ struct TargetBoardView: View {
     let shots: [ShotRecord]
 
     var effectiveTargetRadius: CGFloat {
-        (mode == .rifle) ? (radius * 0.42) : radius
+        (mode == .rifle) ? (radius * 0.35) : radius
     }
 
     var blackThreshold: Int {
@@ -1563,7 +1604,7 @@ struct TargetBoardView: View {
             let dist = effectiveTargetRadius * CGFloat(10.5 - Double(num)) / 10.0
             let isWhite = num >= blackThreshold
             let numColor = isWhite ? Color.white : Color.black
-            let fontSize: CGFloat = (mode == .rifle) ? 6.0 : 7.5
+            let fontSize: CGFloat = (mode == .rifle) ? 5.2 : 7.5
 
             Text("\(num)").font(.system(size: fontSize, weight: .bold)).foregroundColor(numColor).offset(y: -dist)
             Text("\(num)").font(.system(size: fontSize, weight: .bold)).foregroundColor(numColor).offset(y: dist)
@@ -1660,31 +1701,31 @@ struct WNotchShape: Shape {
     }
 }
 
-// MARK: - Rifle Concentric Sight View (由外到內的第二個同心圓，比4分那一環大一點)
-// Note: Ring 4 diameter is approx 65pt. The 2nd concentric circle is 78pt, clearly larger than ring 4!
+// MARK: - Rifle Concentric Sight View (覘孔同心圓瞄準，瞄準環直徑約77pt，與1分外環差不多重疊)
+// Note: Rifle Ring 1 diameter is 77pt (110 * 0.35 * 2). Sight 2nd ring is 77pt, perfectly overlapping Ring 1!
 struct RifleConcentricSightView: View {
     var body: some View {
         ZStack {
-            // 1st circle (most outside housing): 124pt
+            // 1st circle (most outside housing): 120pt
             Circle()
                 .stroke(Color.black.opacity(0.75), lineWidth: 12)
-                .frame(width: 124, height: 124)
+                .frame(width: 120, height: 120)
 
-            // 2nd circle (由外到內第二個): 78pt (比4環的65pt直徑大，留有清晰白環光圈)
+            // 2nd circle (瞄準環/同心圓瞄準環): 77pt，與步槍1分外環（直徑 77pt）精準重疊
             Circle()
-                .stroke(Color.black.opacity(0.85), lineWidth: 2.8)
-                .frame(width: 78, height: 78)
+                .stroke(Color.black.opacity(0.85), lineWidth: 2.6)
+                .frame(width: 77, height: 77)
 
             // Horizontal crossbars supporting the 2nd aperture
             Rectangle()
                 .fill(Color.black.opacity(0.75))
-                .frame(width: 22, height: 1.4)
-                .offset(x: -48)
+                .frame(width: 21, height: 1.4)
+                .offset(x: -47)
 
             Rectangle()
                 .fill(Color.black.opacity(0.75))
-                .frame(width: 22, height: 1.4)
-                .offset(x: 48)
+                .frame(width: 21, height: 1.4)
+                .offset(x: 47)
 
             // Fine inner target alignment ring: 16pt
             Circle()
@@ -1719,8 +1760,8 @@ struct InstructionsSheetView: View {
                         instructionItem(
                             title: language == .traditionalChinese ? "🎯 高分瞄準訣竅" : "🎯 Pro Sighting Tips for High Scores",
                             desc: language == .traditionalChinese ?
-                                "• 手槍（三點一線）：前方的凸起（準星）對齊後方缺口（照門）中央。將準星切在黑色靶心正下方一點點，即可擊中高分。\n\n• 步槍（同心圓）：透過後方圓孔（覘孔）看前方圓環。將黑心靶完整套在圓環正中間（留一圈均勻的白邊）即可。" :
-                                "• Pistol (3-Point Alignment): Align the front sight post centrally inside the rear sight notch. Cut the top of the post just below the black bullseye to hit the high-score.\n\n• Rifle (Concentric Circles): Look through the rear peep hole to the front aperture ring. Center the black bullseye target completely within the front ring, leaving a uniform white border around it."
+                                "• 手槍（三點一線）：前方的凸起（準星）對齊後方缺口（照門）中央。將準星切在黑色靶心正下方一點點，即可擊中高分。\n\n• 步槍（同心圓）：透過後方圓孔（覘孔）看前方瞄準圓環。瞄準環與1分外環剛好重疊，將整個靶心維持在同心圓正中央即可擊出10分！" :
+                                "• Pistol (3-Point Alignment): Align the front sight post centrally inside the rear sight notch. Cut the top of the post just below the black bullseye to hit the high-score.\n\n• Rifle (Concentric Circles): Look through the rear peep hole to the front aperture ring. The aiming ring neatly overlaps the 1-point outer ring—center the bullseye target within it to score 10s!"
                         )
                         instructionItem(
                             title: language == .traditionalChinese ? "📊 成績與紀錄" : "📊 Scores & Match Records",
