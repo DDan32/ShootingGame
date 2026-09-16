@@ -1853,7 +1853,7 @@ struct OlympicScorecardView: View {
 
                         // Series Breakdown Cards
                         if seriesChunks.isEmpty {
-                            Text(language == .traditionalChinese ? "尚未進行擊發，請回到射擊場擊發子彈。" : "No shots fired yet. Return to the range and shoot.")
+                            Text(language == .traditionalChinese ? "尚未進行擊發，請回到射擊場擊發。" : "No shots fired yet. Return to the range and shoot.")
                                 .font(.system(size: 14))
                                 .foregroundColor(Color.black.opacity(0.5))
                                 .padding(40)
