@@ -31,8 +31,10 @@ The application models the two primary 10-meter shooting disciplines:
 - Inner 10-Ring (X-Ring) Diameter: 5.0 mm
 - Ammunition Caliber: 4.5 mm (.177 in)
 - Scoring Logic:
-- 10.9 Maximum Score: The 4.5 mm pellet imprint must remain completely within the 5.0 mm inner 10-ring without breaching the boundary line.
-- Decimal scores from 10.0 to 10.8 scale progressively between the 10-ring and the inner 10-ring.
+  - Inward Gauging: A score is awarded whenever the pellet's outer circumference touches or breaks the score ring's outer boundary.
+  - 10.0 Score Threshold: Achieved when the bullet outer edge touches the 10-ring line (bullet center distance to target center <= 8.00 mm = 5.75 mm 10-ring radius + 2.25 mm pellet radius).
+  - 10.9 Maximum Score: Awarded when bullet center distance to target center <= 0.80 mm.
+  - Decimal Step: Each 0.80 mm decrease toward center gains +0.1 points (up to 10.9); each 0.80 mm increase deducts 0.1 points (down to 1.0; > 80.00 mm is 0.0).
 
 ### 10m Air Rifle
 - Target Scoring Face (Ring 1): 45.5 mm diameter
@@ -41,9 +43,10 @@ The application models the two primary 10-meter shooting disciplines:
 - 10-Ring Center Dot: 0.5 mm diameter (white dot)
 - Ammunition Caliber: 4.5 mm (.177 in)
 - Scoring Logic:
-- 10.0 Score Threshold: Achieved when the edge of the bullet imprint touches the 0.5 mm center dot (the center of the pellet lies directly on the 9-ring boundary).
-- 10.9 Maximum Score: Achieved when the 4.5 mm bullet sits completely inside the 5.5 mm 9-ring without touching the 9-ring boundary line.
-- Sub-millimeter decimal gradation based on radial offset from the center.
+  - Inward Gauging: A score is awarded whenever the pellet's outer circumference touches or breaks the score ring's outer boundary.
+  - 10.0 Score Threshold: Achieved when the bullet outer edge touches the 0.5 mm center dot (bullet center distance to target center <= 2.50 mm = 0.25 mm center dot radius + 2.25 mm pellet radius).
+  - 10.9 Maximum Score: Awarded when bullet center distance to target center <= 0.25 mm.
+  - Decimal Step: Each 0.25 mm decrease toward center gains +0.1 points (up to 10.9); each 0.25 mm increase deducts 0.1 points (down to 1.0; > 25.00 mm is 0.0).
 
 ---
 

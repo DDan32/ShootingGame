@@ -1293,8 +1293,9 @@ struct GameView: View {
                     }
 
                     HStack(spacing: 3) {
-                        let devMm = max(0.0, (10.9 - last.score) * 0.25)
-                        Text(last.isPerfect ? (language == .traditionalChinese ? "正中 0.0mm" : "Center 0.0mm") : String(format: "%.2fmm", devMm))
+                        let distPt = sqrt(last.offsetX * last.offsetX + last.offsetY * last.offsetY)
+                        let distMm = (last.mode == .pistol) ? (distPt / (targetRadius / 77.75)) : (distPt / ((targetRadius * 0.30) / 22.75))
+                        Text(last.isPerfect ? (language == .traditionalChinese ? "正中 0.0mm" : "Center 0.0mm") : String(format: "%.2fmm", distMm))
                             .font(.system(size: 8, weight: .bold, design: .monospaced))
                             .foregroundColor(Color.black.opacity(0.7))
 
@@ -1487,68 +1488,51 @@ struct GameView: View {
 
         let computedScore: Double
         if aimMode == .pistol {
-            // ISSF 10m 手槍靶官方標準（17x17cm，10環直徑11.5mm，內10環直徑5.0mm，1環外徑155.5mm）
-            // 比例換算：1環半徑 77.75mm 對應 targetRadius = 110.0pt (1.4148 pt/mm)
-            // 子彈直徑 4.5mm (半徑 2.25mm = 3.183pt)
-            // 內10環半徑 2.50mm = 3.537pt；10環半徑 5.75mm = 8.135pt
-            // 10.9 判定：子彈完全在 5.0mm 內環裡面 (dist <= 0.25mm = 0.354pt)
+            // ISSF 10m 手槍靶標準（17x17cm，1環半徑 77.75mm 對應 targetRadius = 110.0pt）
+            // 子彈直徑 4.5mm（半徑 2.25mm）
+            // 倒數第二個環為 10 環（直徑 11.5mm，半徑 5.75mm）；最內環為 10.9 環
+            // 子彈外圍碰到 10 分環外圈即達 10.0 分：
+            // 子彈中心距離靶心 = 10環半徑(5.75mm) + 子彈半徑(2.25mm) = 8.00mm
+            // 每減少 0.8mm 多獲得 0.1 分（至 10.9 滿分）；每增加 0.8mm 扣 0.1 分
             let ptPerMm: CGFloat = targetRadius / 77.75
-            let bulletRadius: CGFloat = 2.25 * ptPerMm
-            let inner10Radius: CGFloat = 2.50 * ptPerMm
-            let ring10Radius: CGFloat = 5.75 * ptPerMm
-            let dist10_9: CGFloat = max(0.1, inner10Radius - bulletRadius) // ~0.354pt
+            let distMm = Double(dist / ptPerMm)
+            let stepMm: Double = 0.80
+            let maxTouchRadiusMm: Double = 77.75 + 2.25 // 80.00mm（碰觸1環外緣）
 
-            if dist <= dist10_9 {
-                computedScore = 10.9
-            } else if dist >= targetRadius + bulletRadius {
+            if distMm > maxTouchRadiusMm {
                 computedScore = 0.0
-            } else if dist <= ring10Radius {
-                // 10.0 ~ 10.8 區間
-                let ratio = (dist - dist10_9) / (ring10Radius - dist10_9)
-                let raw = 10.8 - ratio * 0.8
-                computedScore = max(10.0, min(10.8, (raw * 10.0).rounded() / 10.0))
+            } else if distMm <= stepMm {
+                // 距離 <= 0.80mm 為 10.9 滿分
+                computedScore = 10.9
             } else {
-                // 9.9 ~ 1.0 區間（各環半徑步長 8.0mm * ptPerMm = 11.318pt）
-                let ringStep = 8.0 * ptPerMm
-                let stepsAway = (dist - ring10Radius) / ringStep
-                let raw = 9.9 - Double(stepsAway) * 1.0
-                computedScore = max(0.0, min(9.9, (raw * 10.0).rounded() / 10.0))
+                let subdivisions = ceil((distMm - 1e-7) / stepMm)
+                let raw = 11.0 - subdivisions * 0.1
+                computedScore = max(0.0, min(10.9, (raw * 10.0).rounded() / 10.0))
             }
         } else {
-            // ISSF 10m 步槍靶官方標準（1環總直徑45.5mm，4環直徑30.5mm，9環直徑5.5mm，10環中心白點0.5mm）
-            // 比例換算：1環半徑 22.75mm 對應 effectiveRadius = 33.0pt (1.4505 pt/mm)
-            // 子彈直徑 4.5mm (半徑 2.25mm = 3.264pt)
-            // 9環半徑 2.75mm = 3.989pt；10環中心點半徑 0.25mm = 0.363pt
-            // 核心規則：
-            // 1. 子彈完全在9分環內且不觸碰9分環線為 10.9 分 (dist <= 0.50mm = 0.725pt)
-            // 2. 子彈邊緣碰到中心點就算是 10.0 分（子彈中心壓在9分環上，dist <= 2.50mm = 3.626pt）
+            // ISSF 10m 步槍靶標準（1環半徑 22.75mm 對應 effectiveRadius = 33.0pt）
+            // 子彈直徑 4.5mm（半徑 2.25mm）
+            // 10.0分環為直徑 0.5mm 點（半徑 0.25mm）
+            // 子彈外圍碰到 10 分點即達 10.0 分：
+            // 子彈中心距離靶心 = 10分點半徑(0.25mm) + 子彈半徑(2.25mm) = 2.50mm
+            // 每減少 0.25mm 多獲得 0.1 分（至 10.9 滿分）；每增加 0.25mm 扣 0.1 分
             let effectiveRadius = targetRadius * 0.30
             let ptPerMm: CGFloat = effectiveRadius / 22.75
-            let bulletRadius: CGFloat = 2.25 * ptPerMm
-            let centerDotRadius: CGFloat = 0.25 * ptPerMm
-            let ring9Radius: CGFloat = 2.75 * ptPerMm
+            let distMm = Double(dist / ptPerMm)
+            let stepMm: Double = 0.25
+            let maxTouchRadiusMm: Double = 22.75 + 2.25 // 25.00mm（碰觸1環外緣）
 
-            let dist10_9: CGFloat = max(0.1, ring9Radius - bulletRadius) // ~0.725pt (0.50mm)
-            let dist10_0: CGFloat = centerDotRadius + bulletRadius // ~3.626pt (2.50mm，邊緣觸碰中心白點，中心壓在9分環上)
-
-            if dist <= dist10_9 {
-                computedScore = 10.9
-            } else if dist >= effectiveRadius + bulletRadius {
+            if distMm > maxTouchRadiusMm {
                 computedScore = 0.0
-            } else if dist <= dist10_0 {
-                // 10.0 ~ 10.8 分（子彈邊緣碰到中心點以內）
-                let ratio = (dist - dist10_9) / (dist10_0 - dist10_9)
-                let raw = 10.9 - ratio * 0.9
-                computedScore = max(10.0, min(10.8, (raw * 10.0).rounded() / 10.0))
+            } else if distMm <= stepMm {
+                // 距離 <= 0.25mm 為 10.9 滿分
+                computedScore = 10.9
             } else {
-                // 9.9 ~ 1.0 分（環距步長 2.5mm * ptPerMm = 3.626pt）
-                let ringStep = 2.5 * ptPerMm
-                let stepsAway = (dist - dist10_0) / ringStep
-                let raw = 9.9 - Double(stepsAway) * 1.0
-                computedScore = max(0.0, min(9.9, (raw * 10.0).rounded() / 10.0))
+                let subdivisions = ceil((distMm - 1e-7) / stepMm)
+                let raw = 11.0 - subdivisions * 0.1
+                computedScore = max(0.0, min(10.9, (raw * 10.0).rounded() / 10.0))
             }
         }
-
         let newShot = ShotRecord(
             offset: impactPoint,
             score: computedScore,
